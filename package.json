@@ -30,6 +30,7 @@
     "build": "tsup",
     "type-check": "tsc --noEmit",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:e2e": "node tests/e2e/suite.mjs",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",

@@ -120,12 +120,12 @@ export class TaskManager {
 }
 
 const defaultTaskTemplate = `---
-title: "Task Details"
+title: "Task Name"
 created: 2025-01-01
 status: todo
 ---
 
-# Task
+# Task: [Task Name]
 `
 
 export const taskManager = new TaskManager()
