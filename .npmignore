@@ -1,5 +1,6 @@
 # Test files
 tests/
+lab/
 *.test.js
 coverage/
 .temp-test/

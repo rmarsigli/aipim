@@ -4,7 +4,23 @@ import { mergeGuidelines } from './merger'
 import { InstallConfig, DetectedProject } from '@/types'
 
 export async function installProject(config: InstallConfig, detected: DetectedProject): Promise<void> {
-    const templatesDir = path.join(__dirname, '../templates')
+    // Try to find templates relative to the current script
+    // In production (dist), it usually is a sibling 'templates'
+    // In development (src/core), it is '../templates'
+    let templatesDir = path.join(__dirname, 'templates')
+    
+    if (!fs.existsSync(templatesDir)) {
+        templatesDir = path.join(__dirname, '../templates')
+    }
+
+    if (!fs.existsSync(templatesDir)) {
+        // Fallback for when running from root or unexpected structure
+        templatesDir = path.join(process.cwd(), 'src/templates')
+    }
+    
+    if (!fs.existsSync(templatesDir)) {
+        throw new Error(`Templates directory not found. Searched in: ${path.join(__dirname, 'templates')} and ${path.join(__dirname, '../templates')}`)
+    }
 
     await createProjectStructure(templatesDir)
 

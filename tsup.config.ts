@@ -13,5 +13,6 @@ export default defineConfig({
     splitting: false,
     onSuccess: async () => {
         await fs.copyFile('package.json', 'dist/package.json')
+        await fs.copy('src/templates', 'dist/templates')
     }
 })

@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "1.0.0",
+  "version": "1.0.1-beta.1",
   "description": "Markdown-based project management system optimized for AI-assisted development",
   "homepage": "https://github.com/rmarsigli/aipm",
   "bugs": {
