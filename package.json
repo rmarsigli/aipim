@@ -1,14 +1,14 @@
 {
-  "name": "ia-project-manager",
+  "name": "ai-project-manager",
   "version": "1.0.0",
   "description": "Markdown-based project management system optimized for AI-assisted development",
-  "homepage": "https://github.com/rmarsigli/ia-project-manager",
+  "homepage": "https://github.com/rmarsigli/ai-project-manager",
   "bugs": {
-    "url": "https://github.com/rmarsigli/ia-project-manager/issues"
+    "url": "https://github.com/rmarsigli/ai-project-manager/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rmarsigli/ia-project-manager.git"
+    "url": "git+https://github.com/rmarsigli/ai-project-manager.git"
   },
   "license": "MIT",
   "author": "Rafhael Marsigli <oi@rafhael.com.br>",
