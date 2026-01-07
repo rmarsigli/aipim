@@ -22,7 +22,7 @@ Useful information:
 
 ```bash
 # Install to your existing project
-npx aipm install
+npx @rmarsigli/aipm install
 ```
 
 ### Usage
