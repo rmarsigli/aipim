@@ -1,0 +1,27 @@
+{
+  "name": "ia-project-manager",
+  "version": "1.0.0",
+  "description": "Markdown-based project management system optimized for AI-assisted development",
+  "homepage": "https://github.com/rmarsigli/ia-project-manager",
+  "bugs": {
+    "url": "https://github.com/rmarsigli/ia-project-manager/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rmarsigli/ia-project-manager.git"
+  },
+  "license": "MIT",
+  "author": "Rafhael Marsigli <oi@rafhael.com.br>",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "fs-extra": "^11.3.3",
+    "inquirer": "^13.1.0",
+    "ora": "^9.0.0"
+  }
+}
