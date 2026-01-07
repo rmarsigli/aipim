@@ -82,8 +82,11 @@ describe('installProject', () => {
         const validateStats = await fs.stat('.project/scripts/validate-dod.sh')
 
         // Check executable bit (755 = rwxr-xr-x)
-        expect(preSessionStats.mode & 0o111).toBeTruthy()
-        expect(validateStats.mode & 0o111).toBeTruthy()
+        // Skip on Windows as chmod/stat behavior varies significantly
+        if (process.platform !== 'win32') {
+            expect(preSessionStats.mode & 0o111).toBeTruthy()
+            expect(validateStats.mode & 0o111).toBeTruthy()
+        }
     })
 
     test('ignores missing scripts during chmod', async () => {
