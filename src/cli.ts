@@ -110,6 +110,7 @@ program
     })
 
 import { completion } from './commands/completion.js'
+import { registerTaskCommand } from './commands/task.js'
 
 program
     .command('completion')
@@ -117,6 +118,8 @@ program
     .action(() => {
         completion(program)
     })
+
+registerTaskCommand(program)
 
 program.parse(process.argv)
 

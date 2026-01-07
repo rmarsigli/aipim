@@ -52,10 +52,15 @@ ${SignatureManager.VER_PREFIX} ${version} -->
     }
 
     private extractMetadata(content: string): FileMetadata | null {
-        const sigMatch = content.match(new RegExp(`${SignatureManager.SIG_PREFIX}\\s+([a-f0-9]+)\\s+-->`))
+        // Debug regex matching
+        const regexStr = `${SignatureManager.SIG_PREFIX}\\s+([a-f0-9]+)\\s+-->`
+        const sigMatch = content.match(new RegExp(regexStr))
         const verMatch = content.match(new RegExp(`${SignatureManager.VER_PREFIX}\\s+([0-9.]+)\\s+-->`))
 
-        if (!sigMatch) return null
+        if (!sigMatch) {
+            // console.log('Signature extract failed:', regexStr, 'Tail:', content.substring(Math.max(0, content.length - 500)))
+            return null
+        }
 
         return {
             signature: sigMatch[1],
