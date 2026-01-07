@@ -25,6 +25,9 @@
     "LICENSE",
     "README.md"
   ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
