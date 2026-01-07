@@ -499,11 +499,16 @@ Contributions welcome! Please:
 git clone https://github.com/yourusername/ai-project-manager
 cd ai-project-manager
 
+# Install dependencies
+pnpm install
+
+# Build the project
+pnpm run build
+
 # Test in a sample project
 mkdir test-project
-cp -r .project test-project/
 cd test-project
-# Test workflow
+node ../dist/cli.js install
 ```
 
 ---
