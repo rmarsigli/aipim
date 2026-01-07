@@ -1,4 +1,4 @@
-import { FrameworkConfig } from '../types'
+import { FrameworkConfig } from '@/types'
 import fs from 'fs-extra'
 
 const hasDep = (pkg: any, name: string): boolean => pkg?.dependencies?.[name] || pkg?.devDependencies?.[name]

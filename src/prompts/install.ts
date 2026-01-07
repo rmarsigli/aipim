@@ -1,7 +1,7 @@
 import inquirer from 'inquirer'
 import chalk from 'chalk'
-import { getFrameworkDisplayName } from '../core/detector'
-import { DetectedProject, InstallConfig } from '../types'
+import { getFrameworkDisplayName } from '@/core/detector'
+import { DetectedProject, InstallConfig } from '@/types'
 
 export async function promptConfiguration(detected: DetectedProject, options: Partial<InstallConfig> & { yes?: boolean } = {}): Promise<InstallConfig | null> {
     console.log(chalk.blue('\n📋 Installation Options\n'))

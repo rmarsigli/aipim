@@ -1,9 +1,9 @@
 import ora from 'ora'
 import chalk from 'chalk'
-import { detectProject } from '../core/detector'
-import { installProject } from '../core/installer'
-import { promptConfiguration } from '../prompts/install'
-import { InstallConfig } from '../types'
+import { detectProject } from '@/core/detector'
+import { installProject } from '@/core/installer'
+import { promptConfiguration } from '@/prompts/install'
+import { InstallConfig } from '@/types'
 
 export async function install(options: any = {}): Promise<void> {
     try {

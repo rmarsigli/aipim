@@ -1,10 +1,10 @@
 import fs from 'fs-extra'
 import path from 'path'
 import { mergeGuidelines } from './merger'
-import { InstallConfig, DetectedProject } from '../types'
+import { InstallConfig, DetectedProject } from '@/types'
 
 export async function installProject(config: InstallConfig, detected: DetectedProject): Promise<void> {
-    const templatesDir = path.join(__dirname, '../../templates')
+    const templatesDir = path.join(__dirname, '../templates')
 
     await createProjectStructure(templatesDir)
 
@@ -19,10 +19,23 @@ async function createProjectStructure(templatesDir: string): Promise<void> {
     const baseDir = path.join(templatesDir, 'base/.project')
     const targetDir = '.project'
 
-    await fs.copy(baseDir, targetDir, {
-        overwrite: false,
-        errorOnExist: false
-    })
+    try {
+        await fs.copy(baseDir, targetDir, {
+            overwrite: false,
+            errorOnExist: false
+        })
+    } catch (error) {
+        const err = error as { code?: string }
+        
+        if (err.code === 'EACCES') {
+            throw new Error(`Permission denied: Cannot write to ${targetDir}`)
+        }
+        if (err.code === 'ENOSPC') {
+            throw new Error('Disk full: Not enough space to install')
+        }
+
+        throw error
+    }
 
     const dirs = [
         'backlog',

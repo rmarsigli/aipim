@@ -1,7 +1,7 @@
 import fs from 'fs-extra'
 import path from 'path'
-import { FRAMEWORKS, LOCK_FILES, PROMPT_FILES } from '../config/frameworks'
-import { DetectedProject, FrameworkConfig } from '../types'
+import { FRAMEWORKS, LOCK_FILES, PROMPT_FILES } from '@/config/frameworks'
+import { DetectedProject, FrameworkConfig } from '@/types'
 
 export async function detectProject(cwd: string = process.cwd()): Promise<DetectedProject> {
     const pkgPath = path.join(cwd, 'package.json')
