@@ -68,9 +68,9 @@ export async function promptConfiguration(
     ])
 
     if (!options.yes) {
-        logger.info(chalk.blue('\n📄 Installation Summary\n'))
+        logger.info(chalk.blue('\nInstallation Summary\n'))
         if (options.dryRun) {
-            logger.warn('  ⚠️  DRY RUN MODE: No files will be created\n')
+            logger.warn('  DRY RUN MODE: No files will be created\n')
         }
         logger.info('Files to be created:')
         logger.info(chalk.gray('  • .project/ (directory structure)'))
