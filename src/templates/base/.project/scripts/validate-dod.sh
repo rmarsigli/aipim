@@ -55,6 +55,30 @@ if [ -d "resources/js" ] || [ -d "src" ]; then
     fi
 fi
 
+# Check for print() in Python (excluding scripts/tests is hard without specific patterns, checking generic usage)
+if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+    echo -n "  Checking for Python print statements... "
+    PRINT_COUNT=$(grep -r "print(" . --include="*.py" --exclude-dir=venv --exclude-dir=.venv --exclude-dir=tests 2>/dev/null | grep -v "#" | wc -l || echo 0)
+    if [ "$PRINT_COUNT" -gt 0 ]; then
+        echo -e "${YELLOW}${WARNING} Found print() in ${PRINT_COUNT} lines (Python)${NC}"
+        WARNINGS=$((WARNINGS + 1))
+    else
+        echo -e "${GREEN}${CHECK} No print() statements${NC}"
+    fi
+fi
+
+# Check for fmt.Println/Printf in Go
+if [ -f "go.mod" ]; then
+    echo -n "  Checking for Go fmt.Print statements... "
+    GO_PRINT_COUNT=$(grep -r "fmt\.Print" . --include="*.go" --exclude-dir=vendor 2>/dev/null | grep -v "//" | wc -l || echo 0)
+    if [ "$GO_PRINT_COUNT" -gt 0 ]; then
+        echo -e "${YELLOW}${WARNING} Found fmt.Print in ${GO_PRINT_COUNT} lines (Go)${NC}"
+        WARNINGS=$((WARNINGS + 1))
+    else
+        echo -e "${GREEN}${CHECK} No fmt.Print statements${NC}"
+    fi
+fi
+
 # Check for TODO/FIXME comments
 echo -n "  Checking for TODO/FIXME... "
 TODO_COUNT=$(grep -r "TODO\\|FIXME" app/ resources/ src/ --exclude-dir=vendor --exclude-dir=node_modules 2>/dev/null | wc -l || echo 0)
@@ -102,6 +126,41 @@ if [ -f "package.json" ] && command -v npm &> /dev/null; then
             echo -e "${GREEN}${CHECK} All JS tests passing${NC}"
         else
             echo -e "${RED}${CROSS} JS tests failed${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+fi
+
+# Run tests (Python)
+if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+    echo "  Running Python tests..."
+    if command -v pytest &> /dev/null; then
+        if pytest > /dev/null 2>&1; then
+            echo -e "${GREEN}${CHECK} All Python tests passing${NC}"
+        else
+            echo -e "${RED}${CROSS} Python tests failed${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    elif command -v python &> /dev/null; then
+        if python -m unittest discover > /dev/null 2>&1; then
+            echo -e "${GREEN}${CHECK} All Python tests passing${NC}"
+        else
+            echo -e "${RED}${CROSS} Python tests failed${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+         echo -e "${YELLOW}${WARNING} No Python test runner found${NC}"
+    fi
+fi
+
+# Run tests (Go)
+if [ -f "go.mod" ]; then
+    echo "  Running Go tests..."
+    if command -v go &> /dev/null; then
+        if go test ./... > /dev/null 2>&1; then
+            echo -e "${GREEN}${CHECK} All Go tests passing${NC}"
+        else
+            echo -e "${RED}${CROSS} Go tests failed${NC}"
             ERRORS=$((ERRORS + 1))
         fi
     fi
