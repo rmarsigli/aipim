@@ -77,6 +77,18 @@ The system relies on a simple file structure in your project root:
 | `.project/scripts/pre-session.sh` | Estimates token usage for the current session. |
 | `.project/scripts/validate-dod.sh` | validating Definition of Done (tests, lint, etc). |
 
+## Development Scripts
+
+These scripts are available in `package.json` for development usage:
+
+| Command | Description |
+| :--- | :--- |
+| `pnpm build` | Compiles the project using `tsup` (dist/). |
+| `pnpm test` | Runs unit tests (`src/tests`) with Jest. |
+| `pnpm test:e2e` | Runs the comprehensive CLI test suite (Smoke Tests). |
+| `pnpm lint` | Validates code style and checks logic errors. |
+| `pnpm type-check` | Validates TypeScript types. |
+
 ## Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
