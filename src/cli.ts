@@ -19,13 +19,13 @@ const banner = `
 `
 
 program
-    .name('ai-project-manager')
+    .name('aipm')
     .description('AI-optimized project management system')
     .version(version)
 
 program
     .command('install')
-    .description('Install AI Project Manager in current directory')
+    .description('Install AIPM in current directory')
     .option('-y, --yes', 'Skip confirmation prompts')
     .option('-p, --preset <name>', 'Use preset configuration')
     .option('--ai <ais...>', 'AI tools to use (claude-code, gemini, chatgpt)')
@@ -34,7 +34,7 @@ program
     .option('--full', 'Use full version')
     .action(async (options) => {
         console.log(chalk.blue(banner))
-        console.log(chalk.blue(`AI Project Manager v${version}\n`))
+        console.log(chalk.blue(`AIPM v${version}\n`))
         
         try {
             await install(options)
@@ -50,7 +50,7 @@ program
     .option('-f, --force', 'Overwrite customizations')
     .action(async (options) => {
         console.log(chalk.blue(banner))
-        console.log(chalk.blue(`AI Project Manager v${version}\n`))
+        console.log(chalk.blue(`AIPM v${version}\n`))
         
         try {
             await update(options)

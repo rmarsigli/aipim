@@ -1,5 +1,5 @@
 {
-  "name": "ai-project-manager",
+  "name": "aipm",
   "version": "1.0.0",
   "description": "Markdown-based project management system optimized for AI-assisted development",
   "homepage": "https://github.com/rmarsigli/ai-project-manager",
@@ -14,7 +14,7 @@
   "author": "Rafhael Marsigli <oi@rafhael.com.br>",
   "main": "dist/cli.js",
   "bin": {
-    "ai-project-manager": "./dist/cli.js"
+    "aipm": "./dist/cli.js"
   },
   "scripts": {
     "dev": "tsup --watch",

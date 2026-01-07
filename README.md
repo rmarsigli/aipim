@@ -22,7 +22,7 @@ Useful information:
 
 ```bash
 # Install to your existing project
-npx ai-project-manager install
+npx aipm install
 ```
 
 ### Usage
