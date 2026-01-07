@@ -41,55 +41,60 @@ export async function installProject(config: InstallConfig, _detected: DetectedP
     }
 
     logger.debug(`Using templates from: ${templatesDir}`)
-    await createProjectStructure(templatesDir)
+    await createProjectStructure(templatesDir, config.dryRun)
 
     logger.debug('Generating prompt files...')
     await Promise.all(config.ais.map((ai) => generatePrompt(ai, config, templatesDir)))
 
     logger.debug('Making scripts executable...')
-    await makeScriptsExecutable()
+    await makeScriptsExecutable(config.dryRun)
 
-    logger.success('Installation completed successfully')
+    if (config.dryRun) {
+        logger.success('Dry run completed successfully')
+    } else {
+        logger.success('Installation completed successfully')
+    }
 }
 
-async function createProjectStructure(templatesDir: string): Promise<void> {
+async function createProjectStructure(templatesDir: string, dryRun?: boolean): Promise<void> {
     logger.debug('Creating project structure...')
     const baseDir = path.join(templatesDir, 'base/.project')
     const targetDir = '.project'
 
-    try {
-        await fs.copy(baseDir, targetDir, {
-            overwrite: false,
-            errorOnExist: false
-        })
-    } catch (error) {
-        const err = error as { code?: string }
+    if (dryRun) {
+        logger.info(`[DRY RUN] Would copy ${baseDir} to ${targetDir}`)
+    } else {
+        try {
+            await fs.copy(baseDir, targetDir, {
+                overwrite: false,
+                errorOnExist: false
+            })
+        } catch (error) {
+            const err = error as { code?: string }
 
-        if (err.code === 'EACCES') {
-            throw new Error(`Permission denied: Cannot write to ${targetDir}`)
-        }
-        if (err.code === 'ENOSPC') {
-            throw new Error('Disk full: Not enough space to install')
-        }
+            if (err.code === 'EACCES') {
+                throw new Error(`Permission denied: Cannot write to ${targetDir}`)
+            }
+            if (err.code === 'ENOSPC') {
+                throw new Error('Disk full: Not enough space to install')
+            }
 
-        throw error
+            throw error
+        }
     }
 
     const projectDir = path.join(process.cwd(), FILES.PROJECT_DIR)
 
     // Create structure
-    await fs.ensureDir(projectDir)
-
-    // Create standard directories
-    // Create standard directories
-    await Promise.all(PROJECT_STRUCTURE.map((dir) => fs.ensureDir(path.join(projectDir, dir))))
-
-    // Copy templates
-    // ... (templates logic remains as it depends on template filenames which are dynamic based on config)
-
-    // But we should use FILES for specific known files
-    // The installer logic is complex regarding which files to copy...
-    // Let's just fix the .project reference for now.
+    if (dryRun) {
+        logger.info(`[DRY RUN] Would ensure directory: ${projectDir}`)
+        for (const dir of PROJECT_STRUCTURE) {
+            logger.info(`[DRY RUN] Would ensure directory: ${path.join(projectDir, dir)}`)
+        }
+    } else {
+        await fs.ensureDir(projectDir)
+        await Promise.all(PROJECT_STRUCTURE.map((dir) => fs.ensureDir(path.join(projectDir, dir))))
+    }
 }
 
 async function generatePrompt(ai: string, config: InstallConfig, templatesDir: string): Promise<void> {
@@ -102,7 +107,11 @@ async function generatePrompt(ai: string, config: InstallConfig, templatesDir: s
 
     const filename = getPromptFilename(ai)
 
-    await fs.writeFile(filename, basePrompt, 'utf-8')
+    if (config.dryRun) {
+        logger.info(`[DRY RUN] Would write prompt file: ${filename} (${basePrompt.length} bytes)`)
+    } else {
+        await fs.writeFile(filename, basePrompt, 'utf-8')
+    }
 }
 
 function getPromptFilename(ai: string): string {
@@ -116,13 +125,17 @@ function getPromptFilename(ai: string): string {
     return filenames[ai] || `${ai.toUpperCase()}.md`
 }
 
-async function makeScriptsExecutable(): Promise<void> {
+async function makeScriptsExecutable(dryRun?: boolean): Promise<void> {
     const scripts = ['.project/scripts/pre-session.sh', '.project/scripts/validate-dod.sh']
 
     await Promise.all(
         scripts.map(async (script) => {
             if (await fs.pathExists(script)) {
-                await fs.chmod(script, '755')
+                if (dryRun) {
+                    logger.info(`[DRY RUN] Would chmod 755 ${script}`)
+                } else {
+                    await fs.chmod(script, '755')
+                }
             }
         })
     )

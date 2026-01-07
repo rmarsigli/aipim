@@ -31,7 +31,8 @@ export async function install(options: InstallOptions = {}): Promise<void> {
             ais: Array.isArray(options.ai) ? options.ai : [options.ai],
             guidelines: Array.isArray(options.guidelines) ? options.guidelines : [options.guidelines],
             version: options.full ? 'full' : 'compact',
-            skipConfirmation: options.yes || false
+            skipConfirmation: options.yes || false,
+            dryRun: options.dryRun || false
         }
     } else {
         config = await promptConfiguration(detected, options)

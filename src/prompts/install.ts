@@ -8,7 +8,7 @@ export async function promptConfiguration(
     detected: DetectedProject,
     options: Partial<InstallConfig> & { yes?: boolean } = {}
 ): Promise<InstallConfig | null> {
-    logger.info(chalk.blue('\n📋 Installation Options\n'))
+    logger.info(chalk.blue('\nInstallation Options\n'))
 
     const { ais } = await inquirer.prompt<{ ais: string[] }>([
         {
@@ -69,6 +69,9 @@ export async function promptConfiguration(
 
     if (!options.yes) {
         logger.info(chalk.blue('\n📄 Installation Summary\n'))
+        if (options.dryRun) {
+            logger.warn('  ⚠️  DRY RUN MODE: No files will be created\n')
+        }
         logger.info('Files to be created:')
         logger.info(chalk.gray('  • .project/ (directory structure)'))
 
@@ -102,7 +105,8 @@ export async function promptConfiguration(
         ais,
         guidelines,
         version,
-        skipConfirmation: options.yes || false
+        skipConfirmation: options.yes || false,
+        dryRun: options.dryRun
     }
 }
 

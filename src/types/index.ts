@@ -26,6 +26,7 @@ export interface DetectedProject {
 export interface InstallConfig {
     ais: string[]
     guidelines: string[]
+    dryRun?: boolean
     version: 'compact' | 'full'
     skipConfirmation: boolean
 }
@@ -37,9 +38,11 @@ export interface InstallOptions {
     guidelines?: string[]
     compact?: boolean
     full?: boolean
+    dryRun?: boolean
 }
 
 export interface UpdateOptions {
     force?: boolean
+    dryRun?: boolean
     yes?: boolean
 }

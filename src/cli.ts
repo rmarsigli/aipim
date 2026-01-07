@@ -43,6 +43,7 @@ program
     .option('--guidelines <frameworks...>', 'Framework guidelines (react, astro)')
     .option('--compact', 'Use compact version (default)', true)
     .option('--full', 'Use full version')
+    .option('--dry-run', 'Simulate actions without writing files')
     .action(async (options: unknown) => {
         /* eslint-disable no-console */
         console.log(chalk.blue(banner))
@@ -62,6 +63,7 @@ program
     .command('update')
     .description('Update existing installation')
     .option('-f, --force', 'Overwrite customizations')
+    .option('--dry-run', 'Simulate actions without writing files')
     .action(async (options: unknown) => {
         /* eslint-disable no-console */
         console.log(chalk.blue(banner))
