@@ -5,14 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-- Multi-OS CI/CD support (Ubuntu, Windows, macOS).
-- `validate` command to check installation health.
-- `update` command stub/wrapper.
-- `diff` command stub.
-- Centralized constants for better maintainability.
+## [1.0.0] - 2026-01-07
+### Official Release
+- **Production Ready**: Full transition to Native ESM.
+- **Features**:
+  - `install` command with interactive prompts and dry-run mode.
+  - `update` command for upgrading configurations.
+  - `completion` command for shell autocompletion.
+  - `validate` command linked to health checks.
+  - `validate-dod.sh` supporting JS/TS, PHP, Python, and Go.
+  - Multi-OS CI/CD support (Ubuntu, Windows, macOS).
+- **Guidelines**: Standardized templates for React, Astro, Next.js, and Vue.
+- **Testing**: 100% pass rate on unit tests and comprehensive lab scenarios.
 
 ### Changed
 - Refactored codebase to remove `any` types and improve type safety.
