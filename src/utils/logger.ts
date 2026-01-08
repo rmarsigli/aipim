@@ -9,25 +9,25 @@ class Logger {
     }
 
     public info(message: string): void {
-        console.log(chalk.blue('ℹ'), message)
+        console.log(chalk.blue('[INFO]'), message)
     }
 
     public success(message: string): void {
-        console.log(chalk.green('✔'), message)
+        console.log(chalk.green('[SUCCESS]'), message)
     }
 
     public warn(message: string): void {
-        console.warn(chalk.yellow('⚠'), message)
+        console.warn(chalk.yellow('[WARN]'), message)
     }
 
     public error(message: string | Error): void {
         const msg = message instanceof Error ? message.message : message
-        console.error(chalk.red('✖'), msg)
+        console.error(chalk.red('[ERROR]'), msg)
     }
 
     public debug(message: string, meta?: unknown): void {
         if (this.isVerbose) {
-            console.log(chalk.gray('🐛'), message)
+            console.log(chalk.gray('[DEBUG]'), message)
             if (meta) {
                 console.log(chalk.gray(JSON.stringify(meta, null, 2)))
             }

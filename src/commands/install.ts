@@ -9,7 +9,8 @@ import { logger } from '@/utils/logger.js'
 export async function install(options: InstallOptions = {}): Promise<void> {
     const spinner = ora('Detecting project...').start()
     const detected = await detectProject()
-    spinner.succeed('Project detected')
+    spinner.stop()
+    logger.success('Project detected')
 
     if (detected.framework) {
         logger.info(`Found: ${detected.framework} project`)
@@ -51,15 +52,18 @@ export async function install(options: InstallOptions = {}): Promise<void> {
 
     await installProject(config, detected)
 
-    spinner.succeed('Installation complete!')
-
+    spinner.stop()
     logger.success('Installation complete!')
+
     logger.info('Next steps:')
-    logger.info(`  1. Run: ${chalk.cyan('.project/scripts/pre-session.sh')}`)
+    logger.info(`  1. Edit ${chalk.cyan('.project/context.md')} with your project details`)
     logger.info(
-        `  2. Create first task: ${chalk.cyan('cp .project/_templates/v1/task-template.md .project/current-task.md')}`
+        `  2. Read the guide: ${chalk.blue('https://github.com/rmarsigli/aipim/blob/main/docs/basic-usage.md')}`
     )
-    logger.info('  3. Start coding with AI!')
+    logger.info(`  3. Run ${chalk.cyan('.project/scripts/pre-session.sh')} to verify setup`)
+    logger.info(
+        `  4. Start coding! (Copy task template to start: ${chalk.cyan('cp .project/_templates/v1/task-template.md .project/current-task.md')})`
+    )
 
     if (config.ais.includes('claude-code') || config.ais.includes('claude-ai')) {
         logger.info('Start your AI session with:')

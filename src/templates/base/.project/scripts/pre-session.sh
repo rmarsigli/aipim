@@ -11,9 +11,9 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}🔍 Pre-Session Check${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}================================================${NC}"
+echo -e "${BLUE}  Pre-Session Check${NC}"
+echo -e "${BLUE}================================================${NC}"
 echo ""
 
 # ============================================================================
@@ -26,17 +26,18 @@ if [ -f ".project/context.md" ]; then
     CONTEXT_TOKENS=$(echo "$CONTEXT_WORDS * 1.3" | bc | cut -d. -f1)
     
     if [ $CONTEXT_LINES -gt 200 ]; then
-        echo -e "${YELLOW}⚠️  context.md: ${CONTEXT_LINES} lines (target: <200)${NC}"
+        echo -e "${YELLOW}[WARN] context.md: ${CONTEXT_LINES} lines (target: <200)${NC}"
         echo "   Consider archiving old sessions:"
         echo "   ${BLUE}mkdir -p .project/context-archive/${NC}"
         echo "   ${BLUE}mv .project/context.md .project/context-archive/\$(date +%Y-%m).md${NC}"
         echo ""
     else
-        echo -e "${GREEN}✓${NC} context.md: ${CONTEXT_LINES} lines (good)"
+        echo -e "${GREEN}[OK]${NC} context.md: ${CONTEXT_LINES} lines (good)"
     fi
 else
-    echo -e "${RED}✗${NC} context.md not found"
+    echo -e "${RED}[MISSING]${NC} context.md not found"
     CONTEXT_TOKENS=0
+    CONTEXT_LINES=0
 fi
 
 # ============================================================================
@@ -44,7 +45,7 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${BLUE}📊 Token Estimation${NC}"
+echo -e "${BLUE}  Token Estimation${NC}"
 echo ""
 
 # System prompt
@@ -92,13 +93,14 @@ echo "   Estimated total:  ~${ESTIMATED_TOTAL} tokens"
 echo ""
 
 # Budget warning
+# Budget warning
 if [ $ESTIMATED_TOTAL -gt 150000 ]; then
-    echo -e "${RED}⚠️  High token usage expected (>150k)${NC}"
+    echo -e "${RED}[High Usage] High token usage expected (>150k)${NC}"
     echo "   Consider optimizing before session"
 elif [ $ESTIMATED_TOTAL -gt 100000 ]; then
-    echo -e "${YELLOW}⚠️  Moderate token usage (100-150k)${NC}"
+    echo -e "${YELLOW}[Moderate] Moderate token usage (100-150k)${NC}"
 else
-    echo -e "${GREEN}✓${NC} Token usage looks good (<100k)"
+    echo -e "${GREEN}[OK]${NC} Token usage looks good (<100k)"
 fi
 
 # ============================================================================
@@ -106,12 +108,12 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${BLUE}📦 Git Status${NC}"
+echo -e "${BLUE}  Git Status${NC}"
 echo ""
 
 if [ -d ".git" ]; then
     if [ -n "$(git status --porcelain)" ]; then
-        echo -e "${YELLOW}⚠️  Uncommitted changes detected${NC}"
+        echo -e "${YELLOW}[DIRTY] Uncommitted changes detected${NC}"
         echo ""
         git status --short | head -10
         if [ $(git status --porcelain | wc -l) -gt 10 ]; then
@@ -120,7 +122,7 @@ if [ -d ".git" ]; then
         echo ""
         echo "   Consider committing before session"
     else
-        echo -e "${GREEN}✓${NC} Working tree clean"
+        echo -e "${GREEN}[CLEAN]${NC} Working tree clean"
     fi
     
     # Current branch
@@ -135,7 +137,7 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${BLUE}📁 Large Files (>50KB)${NC}"
+echo -e "${BLUE}  Large Files (>50KB)${NC}"
 echo ""
 
 LARGE_FILES=$(find . -type f \( -name "*.php" -o -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" \) \
@@ -146,7 +148,7 @@ LARGE_FILES=$(find . -type f \( -name "*.php" -o -name "*.js" -o -name "*.ts" -o
     2>/dev/null | head -5)
 
 if [ -n "$LARGE_FILES" ]; then
-    echo -e "${YELLOW}⚠️  Found large files:${NC}"
+    echo -e "${YELLOW}[WARN] Found large files:${NC}"
     echo ""
     echo "$LARGE_FILES" | while read file; do
         SIZE=$(du -h "$file" | cut -f1)
@@ -156,7 +158,7 @@ if [ -n "$LARGE_FILES" ]; then
     echo "   Tip: Use view tool with line ranges instead of loading entire file"
     echo "   Example: view ${file}:1:100"
 else
-    echo -e "${GREEN}✓${NC} No large files found"
+    echo -e "${GREEN}[OK]${NC} No large files found"
 fi
 
 # ============================================================================
@@ -164,7 +166,7 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${BLUE}📌 Session Info${NC}"
+echo -e "${BLUE}  Session Info${NC}"
 echo ""
 
 if [ -f ".project/context.md" ]; then
@@ -187,7 +189,7 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${BLUE}💡 Quick Tips${NC}"
+echo -e "${BLUE}  Quick Tips${NC}"
 echo ""
 
 # Tip based on context size
@@ -224,19 +226,19 @@ ISSUES=0
 [ ! -f ".project/current-task.md" ] && [ ! -d ".project/current-task" ] && ISSUES=$((ISSUES + 1))
 
 if [ $ISSUES -eq 0 ] && [ $ESTIMATED_TOTAL -lt 150000 ]; then
-    echo -e "${GREEN}✅ Ready to start session${NC}"
+    echo -e "${GREEN}[READY] Ready to start session${NC}"
     echo ""
     echo "Start with:"
     echo -e "${BLUE}\"Follow session start protocol and continue development\"${NC}"
 elif [ $ISSUES -eq 0 ]; then
-    echo -e "${YELLOW}⚠️  Ready but token usage is high${NC}"
+    echo -e "${YELLOW}[READY] Ready but token usage is high${NC}"
     echo ""
     echo "Consider optimizing before starting"
 else
-    echo -e "${YELLOW}⚠️  Missing critical files${NC}"
+    echo -e "${YELLOW}[SETUP REQUIRED] Missing critical files${NC}"
     echo ""
     echo "Setup required before starting session"
 fi
 
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}================================================${NC}"
 echo ""

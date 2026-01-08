@@ -1,4 +1,4 @@
-import inquirer from 'inquirer'
+import { checkbox, select, confirm } from '@inquirer/prompts'
 import chalk from 'chalk'
 import { DetectedProject, InstallConfig } from '@/types/index.js'
 import { AI_TOOLS, PROMPTS } from '@/constants.js'
@@ -11,25 +11,31 @@ export async function promptConfiguration(
 ): Promise<InstallConfig | null> {
     logger.info(chalk.blue('\nInstallation Options\n'))
 
-    const { ais } = await inquirer.prompt<{ ais: string[] }>([
-        {
-            type: 'checkbox',
-            name: 'ais',
-            message: 'Which AI tools will you use?',
-            choices: [
-                { name: 'Claude Code (terminal AI assistant)', value: AI_TOOLS.CLAUDE_CODE, checked: true },
-                { name: 'Claude.ai (web interface)', value: AI_TOOLS.CLAUDE_AI, checked: true },
-                { name: 'Google Gemini', value: AI_TOOLS.GEMINI, checked: false },
-                { name: 'ChatGPT', value: AI_TOOLS.CHATGPT, checked: false }
-            ],
-            validate: (answer: string[]): boolean | string => {
-                if (answer.length < 1) {
-                    return 'You must choose at least one AI tool.'
-                }
-                return true
-            }
+    const theme = {
+        prefix: '',
+        icon: {
+            cursor: '-',
+            checked: '[x]',
+            unchecked: '[ ]'
         }
-    ])
+    }
+
+    const ais = await checkbox({
+        message: 'Which AI tools will you use?',
+        choices: [
+            { name: 'Claude Code (terminal AI assistant)', value: AI_TOOLS.CLAUDE_CODE, checked: true },
+            { name: 'Claude.ai (web interface)', value: AI_TOOLS.CLAUDE_AI, checked: true },
+            { name: 'Google Gemini', value: AI_TOOLS.GEMINI, checked: false },
+            { name: 'ChatGPT', value: AI_TOOLS.CHATGPT, checked: false }
+        ],
+        validate: (answer: unknown): boolean | string => {
+            if (Array.isArray(answer) && answer.length < 1) {
+                return 'You must choose at least one AI tool.'
+            }
+            return true
+        },
+        theme
+    })
 
     const allGuidelines = guidelineRegistry.list()
     const guidelineChoices = allGuidelines.map((g) => ({
@@ -38,35 +44,29 @@ export async function promptConfiguration(
         checked: detected.framework === g.id || detected.framework?.includes(g.id)
     }))
 
-    const { guidelines } = await inquirer.prompt<{ guidelines: string[] }>([
-        {
-            type: 'checkbox',
-            name: 'guidelines',
-            message: 'Add framework-specific guidelines?',
-            choices: guidelineChoices
-        }
-    ])
+    const guidelines = await checkbox({
+        message: 'Add framework-specific guidelines?',
+        choices: guidelineChoices,
+        theme
+    })
 
-    const { version } = await inquirer.prompt<{ version: 'compact' | 'full' }>([
-        {
-            type: 'list',
-            name: 'version',
-            message: 'Choose system version:',
-            choices: [
-                {
-                    name: 'Compact (1,000 tokens, optimized) [RECOMMENDED]',
-                    value: 'compact',
-                    short: 'Compact'
-                },
-                {
-                    name: 'Full (4,000 tokens, comprehensive)',
-                    value: 'full',
-                    short: 'Full'
-                }
-            ],
-            default: 'compact'
-        }
-    ])
+    const version = await select<'compact' | 'full'>({
+        message: 'Choose system version:',
+        choices: [
+            {
+                name: 'Compact (1,000 tokens, optimized) [RECOMMENDED]',
+                value: 'compact',
+                short: 'Compact'
+            },
+            {
+                name: 'Full (4,000 tokens, comprehensive)',
+                value: 'full',
+                short: 'Full'
+            }
+        ],
+        default: 'compact',
+        theme
+    })
 
     if (!options.yes) {
         logger.info(chalk.blue('\nInstallation Summary\n'))
@@ -88,16 +88,13 @@ export async function promptConfiguration(
             existingFiles.forEach((f: string) => logger.warn(`   • ${f}`))
         }
 
-        const { confirm } = await inquirer.prompt<{ confirm: boolean }>([
-            {
-                type: 'confirm',
-                name: 'confirm',
-                message: 'Proceed with installation?',
-                default: true
-            }
-        ])
+        const confirmed = await confirm({
+            message: 'Proceed with installation?',
+            default: true,
+            theme
+        })
 
-        if (!confirm) {
+        if (!confirmed) {
             return null
         }
     }

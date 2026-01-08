@@ -11,6 +11,9 @@ importers:
 
   .:
     dependencies:
+      '@inquirer/prompts':
+        specifier: ^8.1.0
+        version: 8.1.0(@types/node@25.0.3)
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -23,9 +26,6 @@ importers:
       fs-extra:
         specifier: ^11.3.3
         version: 11.3.3
-      inquirer:
-        specifier: ^13.1.0
-        version: 13.1.0(@types/node@25.0.3)
       ora:
         specifier: ^9.0.0
         version: 9.0.0
@@ -1620,15 +1620,6 @@ packages:
     resolution: {integrity: sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==}
     engines: {node: '>=0.8.19'}
 
-  inquirer@13.1.0:
-    resolution: {integrity: sha512-4vv4GS/9HLnn0radvmHlXUXiNkd2gYCBQ4U1rxZWBJDisu2Z06bzUM9CFU8pcu1vwuAQjo6O+CFiqCYNsEi6qQ==}
-    engines: {node: '>=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0'}
-    peerDependencies:
-      '@types/node': '>=18'
-    peerDependenciesMeta:
-      '@types/node':
-        optional: true
-
   is-arrayish@0.2.1:
     resolution: {integrity: sha512-zz06S8t0ozoDXMG+ube26zeCTNXcKIPJZJi8hBrF4idCLms4CG9QtK7qBl1boi5ODzFpjswb5JPmHCbMpjaYzg==}
 
@@ -2174,10 +2165,6 @@ packages:
     resolution: {integrity: sha512-wDv/Ht1BNHB4upNbK74s9usvl7hObDnvVzknxqY/E/O3X6rW1U1rV1aENEfJ54eFZDTNo7zv1f5N4edCluH7+A==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
-
-  run-async@4.0.6:
-    resolution: {integrity: sha512-IoDlSLTs3Yq593mb3ZoKWKXMNu3UpObxhgA/Xuid5p4bbfi2jdY1Hj0m1K+0/tEuQTxIGMhQDqGjKb7RuxGpAQ==}
-    engines: {node: '>=0.12.0'}
 
   rxjs@7.8.2:
     resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
@@ -4030,18 +4017,6 @@ snapshots:
 
   imurmurhash@0.1.4: {}
 
-  inquirer@13.1.0(@types/node@25.0.3):
-    dependencies:
-      '@inquirer/ansi': 2.0.2
-      '@inquirer/core': 11.1.0(@types/node@25.0.3)
-      '@inquirer/prompts': 8.1.0(@types/node@25.0.3)
-      '@inquirer/type': 4.0.2(@types/node@25.0.3)
-      mute-stream: 3.0.0
-      run-async: 4.0.6
-      rxjs: 7.8.2
-    optionalDependencies:
-      '@types/node': 25.0.3
-
   is-arrayish@0.2.1: {}
 
   is-extglob@2.1.1: {}
@@ -4754,8 +4729,6 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.55.1
       '@rollup/rollup-win32-x64-msvc': 4.55.1
       fsevents: 2.3.3
-
-  run-async@4.0.6: {}
 
   rxjs@7.8.2:
     dependencies:
