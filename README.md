@@ -97,11 +97,17 @@ Ensure your project is healthy with `aipim validate` (or `aipim check`). It chec
 - Script permissions (smart cross-platform checks).
 - File signature verification (detects legacy or tampered files).
 
-### 📋 Task Automation
-Stop copying templates manually. Use `aipim task init <type> <name>` to:
-- Generate a new task file (`TASK-001-feature.md`) with the correct ID.
-- Sign the file for future updates.
-- Automatically append the task to your `backlog.md`.
+### 📋 Task Lifecycle & Automation
+AIPIM enforces a clear lifecycle for your tasks, preventing chaos.
+
+`[ Backlog ] --> [ Current Task ] --> [ Completed / Archive ]`
+
+Use `aipim task init <type> <name>` to:
+- **Auto-number** tasks (`TASK-001`, `TASK-002`) to maintain order.
+- **Generate** a structured file with sections for Context, Objective, and Verification.
+- **Register** the task in `backlog.md` automatically.
+
+*You focus on the code; AIPIM keeps the history organized.*
 
 ## Structure
 
