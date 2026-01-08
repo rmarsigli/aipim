@@ -33,13 +33,28 @@ npx aipim install
 
 ### Usage
 
-1. First use:
+#### 1. Initialize your project
+Run this in your project root to generate the `.project` structure and framework guidelines:
 
-> {talk about your project, more details = better AI experience. You can write in any language} - Now, create a .project/ folder with a README.md file following submitted guidelines.
+```bash
+aipim install
+```
 
-2. Create a task:
+#### 2. Start your AI Session
+AIPIM creates a `CLAUDE.md` (or `GEMINI.md`) file. Most modern AI tools will automatically read this if you mention it or if it's in the context.
 
-> {talk about your task, more details = better AI experience} - Now, plan a task for me to start working on it.
+**For a new project context:**
+> "I have initialized the `.project` folder. Please read `CLAUDE.md` and `.project/context.md` to understand the project architecture and guidelines before we start."
+
+#### 3. Manage Tasks
+Create a new task file with a unique ID and signature:
+
+```bash
+aipim task init feature "Impl User Auth"
+```
+
+**Then tell your AI:**
+> "I have created/updated the active task in `.project/current-task.md`. Please review it and generate a plan."
 
 ## Features
 
