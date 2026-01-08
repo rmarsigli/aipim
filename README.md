@@ -31,7 +31,27 @@ npm install -g aipim
 npx aipim install
 ```
 
-### Usage
+### Methodology: The Cognitive Architecture
+
+AIPIM isn't just a file generator. It implements an **External Memory Architecture** for LLMs to solve the problems of Context Window Limits and Catastrophic Forgetting.
+
+The structure maps directly to how a processor handles memory, but optimized for AI tokens:
+
+### 1. `.project/context.md` (Heap Memory)
+**The Single Source of Truth.**
+Stores immutable project facts: Tech Stack, Business Rules, and Design Patterns. By keeping this file in your prompt context, you prevent hallucinations and ensure the AI respects your architectural constraints (e.g., "Always use `zod` for validation").
+
+### 2. `.project/current-task.md` (Instruction Pointer)
+**The Active Focus.**
+LLMs perform significantly better when focused on a constrained scope. This file acts as the current "Stack Frame," containing only the immediate checklist. Once completed, it is moved to archive, freeing up token space for the next task.
+
+### 3. `.project/decisions/` (Immutable Log)
+**Prevention of Recursion.**
+Architecture Decision Records (ADRs). By documenting *why* you chose a path (e.g., "We use generic components because X"), you prevent the AI from confusingly suggesting refactors or alternatives that were already discarded.
+
+---
+
+## Usage
 
 #### 1. Initialize your project
 Run this in your project root to generate the `.project` structure and framework guidelines:
