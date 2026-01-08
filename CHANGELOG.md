@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-01-07
+### Added
+- **Documentation**: New `docs/basic-usage.md` guide covering core concepts, "Junior Dev" mindset, and advanced CLI features.
+- **Onboarding Link**: Installer now links directly to the basic usage guide.
+
+### Changed
+- **UI Polish**: Removed all emojis from CLI output and prompts for a cleaner "Hacker" aesthetic.
+- **Prompts**: Migrated to `@inquirer/prompts` to customize symbols (no `?`, using `-` for cursor/prefix).
+
+### Fixed
+- **CLI Exit Code**: Fixed `pnpm start` (no args) exiting with code `1`. Now shows help and exits with `0`.
+- **Linting**: Resolved all remaining TypeScript and Prettier issues.
+
 ## [1.1.1] - 2026-01-07
 ### Changed
 - **Documentation**: Polished `README.md` with new "Cognitive Architecture" and "Task Lifecycle" sections to better explain the "Why" and "How" of AIPIM.
