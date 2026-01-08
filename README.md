@@ -1,28 +1,34 @@
-# AI Project Manager
+# AIPIM: Project Instruction Manager
 
-> **Markdown-based project management system optimized for AI-assisted development**
+> **Artificial Intelligence Project Instruction Manager — The root of your AI-assisted workflow.**
 
-Stop spending time re-explaining context to AI. This system creates a persistent memory layer that dramatically improves AI coding sessions while reducing token consumption.
+AIPIM acts as the interface layer between your project and your AI coding assistant (Claude, ChatGPT, Gemini). It manages the "root" instructions—context, guidelines, and memory—ensuring your AI always knows *how* to work on your codebase without hallucinating or forgetting rules.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status: Production Ready](https://img.shields.io/badge/Status-Production%20Ready-green)]()
+[![Status: Production Ready](https://img.shields.io/badge/Status-Version%201.1.0-green)]()
 
-I began by using custom markdown files to manage my projects. It was incredibly effective for documenting decisions, sprints, and tasks. Over the last six months, this system has consistently saved me time and provided a persistent record of every project's evolution.
+## The Concept
 
-However, I realized I was spending too much time re-explaining context to AI, and manually creating these files became a bottleneck. I built this system to automate that process and streamline project management for myself—and now, for you.
+**"Aipim"** (manioc/cassava) is a resilient, versatile root essential to many cultures. 
+In software, the **root** (`/`) is where everything begins.
 
-Useful information:
+**AIPIM** is the grounded structure that:
+1.  **Anchors** your AI with persistent context (Memory).
+2.  **Nurtures** your code with strict Framework Guidelines (Nutrition).
+3.  **Grows** with your project via Task Management (Lifecycle).
 
-- [About Tokens Usage](docs/about-tokens-usage.md)
-- [Troubleshooting](docs/troubleshooting.md)
+Stop pasting context manually. Let **AIPIM** manage the root.
 
 ## Quick Start
 
 ### Installation
 
 ```bash
-# Install to your existing project
-npx @rmarsigli/aipm install
+# Install globally (recommended)
+npm install -g aipim
+
+# Or use npx
+npx aipim install
 ```
 
 ### Usage
@@ -38,26 +44,26 @@ npx @rmarsigli/aipm install
 ## Features
 
 ### 🔒 Safe Update Strategy
-Updates are now reliable and safe. `aipm update` automatically:
+Updates are now reliable and safe. `aipim update` automatically:
 - **Scans** your project for changes.
 - **Backs up** the `.project` directory before touching anything.
 - **Preserves** your customizations (modified files are skipped).
 - **Updates** only pristine files to the latest version.
 
 ### 📐 Framework Guidelines
-Stop pasting context manually. `aipm install` now:
+Stop pasting context manually. `aipim install` now:
 - **Detects** your technology stack (e.g. Next.js, Astro, Vue, Node.js).
 - **Injects** optimized official guidelines into your AI rules (`CLAUDE.md`, etc).
 - **Ensures** AI follows project-specific coding standards automatically.
 
 ### 🩺 Doctor (`validate`)
-Ensure your project is healthy with `aipm check` (or `validate`). It checks:
+Ensure your project is healthy with `aipim validate` (or `aipim check`). It checks:
 - Directory structure integrity.
 - Script permissions (smart cross-platform checks).
 - File signature verification (detects legacy or tampered files).
 
 ### 📋 Task Automation
-Stop copying templates manually. Use `aipm task init <type> <name>` to:
+Stop copying templates manually. Use `aipim task init <type> <name>` to:
 - Generate a new task file (`TASK-001-feature.md`) with the correct ID.
 - Sign the file for future updates.
 - Automatically append the task to your `backlog.md`.

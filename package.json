@@ -1,11 +1,11 @@
 {
-  "name": "@rmarsigli/aipm",
+  "name": "aipim",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
   "version": "1.1.0",
-  "description": "Markdown-based project management system optimized for AI-assisted development",
+  "description": "Artificial Intelligence Project Instruction Manager - The root of your AI-assisted workflow.",
   "homepage": "https://github.com/rmarsigli/aipm",
   "bugs": {
     "url": "https://github.com/rmarsigli/aipm/issues"
@@ -18,7 +18,7 @@
   "author": "Rafhael Marsigli <oi@rafhael.com.br>",
   "main": "dist/cli.js",
   "bin": {
-    "aipm": "./dist/cli.js"
+    "aipim": "./dist/cli.js"
   },
   "files": [
     "dist",
