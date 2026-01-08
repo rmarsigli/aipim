@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-01-07
+### Changed
+- **Documentation**: Polished `README.md` with new "Cognitive Architecture" and "Task Lifecycle" sections to better explain the "Why" and "How" of AIPIM.
+- **Security**: Enabled NPM Provenance signing for Trusted Publishing.
+
 ## [1.1.0] - 2026-01-07
 ### Added
 - **Framework Guidelines System**: Auto-detects project framework (`react`, `next`, `vue`, `astro`, `node`) and configures AI prompts with strict, best-practice guidelines.

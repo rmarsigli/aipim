@@ -154,4 +154,4 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 
 ## License
 
-MIT -- see [LICENSE](LICENSE) file.
+[MIT](LICENSE)
