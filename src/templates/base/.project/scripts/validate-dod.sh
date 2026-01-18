@@ -356,6 +356,82 @@ fi
 echo ""
 
 # ============================================================================
+# TASK BREAKDOWN CHECKS
+# ============================================================================
+
+echo -e "${BLUE}📋 Task Breakdown Checks${NC}"
+
+# Check if large tasks have phase breakdown
+echo -n "  Checking large task breakdown... "
+if [ -f ".project/current-task.md" ]; then
+    ESTIMATED_HOURS=$(grep "^estimated_hours:" .project/current-task.md 2>/dev/null | sed 's/estimated_hours: //' || echo "0")
+
+    if [ "$ESTIMATED_HOURS" -gt 12 ] 2>/dev/null; then
+        # Task >12h, check for phase breakdown
+        PHASE_COUNT=$(grep "^### Phase [0-9]" .project/current-task.md 2>/dev/null | wc -l || echo "0")
+
+        if [ "$PHASE_COUNT" -eq 0 ]; then
+            echo -e "${RED}${CROSS} Task ${ESTIMATED_HOURS}h requires phase breakdown (0 phases found)${NC}"
+            echo "    Tasks >12h must be broken into 3-5 phases of 2-6h each"
+            echo "    See Large Task Auto-Breakdown Protocol in project-manager.md"
+            ERRORS=$((ERRORS + 1))
+        elif [ "$PHASE_COUNT" -lt 3 ]; then
+            echo -e "${YELLOW}${WARNING} Only ${PHASE_COUNT} phases for ${ESTIMATED_HOURS}h task (recommend 3-5)${NC}"
+            WARNINGS=$((WARNINGS + 1))
+        else
+            # Check if phases have deliverables and commit messages
+            PHASES_WITH_DELIVERABLE=$(grep -c "^\*\*Deliverable:\*\*" .project/current-task.md 2>/dev/null || echo "0")
+            PHASES_WITH_COMMIT=$(grep -c "^\*\*Commit message:\*\*" .project/current-task.md 2>/dev/null || echo "0")
+
+            if [ "$PHASES_WITH_DELIVERABLE" -lt "$PHASE_COUNT" ] || [ "$PHASES_WITH_COMMIT" -lt "$PHASE_COUNT" ]; then
+                echo -e "${YELLOW}${WARNING} ${PHASE_COUNT} phases found, but missing deliverables/commits${NC}"
+                echo "    Each phase should have: **Deliverable:** and **Commit message:**"
+                WARNINGS=$((WARNINGS + 1))
+            else
+                # Extract phase estimates and sum them
+                PHASE_SUM=$(grep "^### Phase" .project/current-task.md 2>/dev/null | grep -oE "\([0-9]+h\)" | grep -oE "[0-9]+" | awk '{sum+=$1} END {print sum}' || echo "0")
+
+                if [ "$PHASE_SUM" -eq 0 ]; then
+                    echo -e "${YELLOW}${WARNING} ${PHASE_COUNT} phases found but no time estimates${NC}"
+                    echo "    Format: ### Phase 1: Name (3h)"
+                    WARNINGS=$((WARNINGS + 1))
+                else
+                    DIFF=$((PHASE_SUM - ESTIMATED_HOURS))
+                    DIFF_ABS=${DIFF#-}
+
+                    if [ "$DIFF_ABS" -gt 1 ]; then
+                        echo -e "${YELLOW}${WARNING} Phase sum (${PHASE_SUM}h) != total estimate (${ESTIMATED_HOURS}h), diff: ${DIFF}h${NC}"
+                        echo "    Phases should sum to total ±1h tolerance"
+                        WARNINGS=$((WARNINGS + 1))
+                    else
+                        echo -e "${GREEN}${CHECK} ${PHASE_COUNT} phases, ${PHASE_SUM}h total (matches ${ESTIMATED_HOURS}h)${NC}"
+                    fi
+                fi
+            fi
+        fi
+    else
+        echo -e "${GREEN}${CHECK} Task ${ESTIMATED_HOURS}h, breakdown not required${NC}"
+    fi
+elif [ -d ".project/current-task" ]; then
+    # Check main.md in directory
+    if [ -f ".project/current-task/main.md" ]; then
+        ESTIMATED_HOURS=$(grep "^estimated_hours:" .project/current-task/main.md 2>/dev/null | sed 's/estimated_hours: //' || echo "0")
+        if [ "$ESTIMATED_HOURS" -gt 12 ] 2>/dev/null; then
+            echo -e "${YELLOW}${WARNING} Complex task directory, verify phase breakdown in main.md${NC}"
+            WARNINGS=$((WARNINGS + 1))
+        else
+            echo -e "${GREEN}${CHECK} Complex task directory exists${NC}"
+        fi
+    else
+        echo -e "${YELLOW}${WARNING} Task directory exists but no main.md${NC}"
+    fi
+else
+    echo -e "${YELLOW}${WARNING} No current task file${NC}"
+fi
+
+echo ""
+
+# ============================================================================
 # SUMMARY
 # ============================================================================
 
