@@ -40,6 +40,154 @@
 3. **Update metrics** (see Metrics Protocol below)
 4. Commit & push
 
+## Large Task Auto-Breakdown Protocol
+
+**MANDATORY: Break down tasks >12h into manageable phases**
+
+### When to Break Down
+
+When starting a task with `estimated_hours > 12`:
+
+1. **Analyze complexity** and identify natural phases
+2. **Create 3-5 phases** of 2-6 hours each
+3. **Document phases** in current-task.md under Implementation section
+4. **Treat each phase as mini-task** with its own commit upon completion
+
+### Phase Breakdown Criteria
+
+**Typical phase structure:**
+
+1. **Setup/Scaffolding** (1-3h)
+   - Schema/migrations
+   - Directory structure
+   - Dependencies
+   - Basic configuration
+
+2. **Core Implementation** (4-6h)
+   - Main business logic
+   - Data processing
+   - API endpoints
+   - Integration points
+
+3. **Testing** (2-4h)
+   - Unit tests
+   - Integration tests
+   - Edge cases
+   - Error handling
+
+4. **Documentation & Polish** (1-3h)
+   - API documentation
+   - README updates
+   - Code cleanup
+   - Examples
+
+### Phase Documentation Format
+
+Add to current-task.md under Implementation:
+
+```markdown
+### Phase 1: Setup & Schema (3h)
+- [ ] Define data schema
+- [ ] Create database tables/migrations
+- [ ] Setup dependencies
+- [ ] Basic configuration
+
+**Deliverable:** Database ready, dependencies installed
+**Commit message:** feat(phase1): setup schema and dependencies
+
+### Phase 2: Core Implementation (6h)
+- [ ] Implement main business logic
+- [ ] Create API endpoints
+- [ ] Add data validation
+- [ ] Error handling
+
+**Deliverable:** Core functionality working
+**Commit message:** feat(phase2): implement core functionality
+
+### Phase 3: Testing (4h)
+- [ ] Unit tests for core logic
+- [ ] Integration tests
+- [ ] Edge case coverage
+- [ ] Performance validation
+
+**Deliverable:** 80%+ test coverage
+**Commit message:** test(phase3): comprehensive test suite
+
+### Phase 4: Documentation (2h)
+- [ ] API documentation
+- [ ] README updates
+- [ ] Usage examples
+- [ ] Code comments where needed
+
+**Deliverable:** Complete documentation
+**Commit message:** docs(phase4): add comprehensive documentation
+```
+
+### Validation Rules
+
+**Before starting implementation, verify:**
+
+1. ✅ All phases clearly defined with deliverables
+2. ✅ Sum of phase estimates matches total estimate (±1h tolerance)
+3. ✅ Each phase is 2-6 hours (not too small, not too large)
+4. ✅ Each phase has clear completion criteria
+5. ✅ Commit message convention defined per phase
+
+**During implementation:**
+
+- Complete phases sequentially (no skipping)
+- Commit immediately after completing each phase
+- Update checkboxes in real-time
+- If phase exceeds estimate by >50%, reassess remaining phases
+
+### Benefits
+
+- **Reduced stall risk:** Clear checkpoints prevent midway blockage
+- **Better tracking:** Visible progress through phase completion
+- **Atomic commits:** Each phase is a logical unit of work
+- **Easier estimation:** Breaking down improves accuracy for future tasks
+- **Context preservation:** Easier to resume if interrupted
+
+### Example: 18h Task Breakdown
+
+**Before (risky):**
+```yaml
+title: "Implement Oracle Profiling System"
+estimated_hours: 18
+```
+
+**After (manageable):**
+```markdown
+## Implementation
+
+### Phase 1: Setup & Schema (3h)
+- [ ] Define profile schema (tactics, patterns, confidence)
+- [ ] Create PostgreSQL tables with indexes
+- [ ] Write migrations
+- [ ] Setup model relationships
+
+### Phase 2: Tactical Pattern Detection (6h)
+- [ ] Implement pin detection algorithm
+- [ ] Add fork detection logic
+- [ ] Create skewer pattern recognition
+- [ ] Build discovered attack tracker
+- [ ] Add confidence scoring system
+
+### Phase 3: Testing & Validation (5h)
+- [ ] Unit tests for each pattern detector
+- [ ] Integration tests with sample games
+- [ ] Edge case handling (ambiguous positions)
+- [ ] Performance tests (1000+ game analysis)
+
+### Phase 4: Documentation & Polish (4h)
+- [ ] API documentation for profiling endpoints
+- [ ] README with usage examples
+- [ ] Code cleanup and optimization
+- [ ] Add inline comments for complex algorithms
+```
+
+**Result:** 4 phases × avg 4.5h = 18h total, each with clear deliverable
+
 ## Metrics Tracking Protocol
 
 **MANDATORY: Update metrics after completing each task**
