@@ -68,6 +68,28 @@ A script to check your token usage and context size before starting a long AI se
 ```
 Use this to ensure you aren't pasting a 50,000 token context unnecessarily!
 
+### Context Management & Auto-Archiving
+
+AIPIM automatically manages your `context.md` file to prevent it from growing too large and consuming excessive tokens.
+
+**Automatic Archiving (v1.2+):**
+- Every 10 sessions, AIPIM archives old session summaries
+- Keeps the last 5 sessions in `context.md`
+- Archives older sessions to `.project/context-archive/`
+- Preserves all historical context without bloating the main file
+
+**Manual archiving:**
+```bash
+.project/scripts/archive-context.sh          # Run archiving
+.project/scripts/archive-context.sh --dry-run  # Preview without changes
+.project/scripts/archive-context.sh --force    # Force archive now
+```
+
+**Best Practices:**
+- Keep `context.md` focused on current state and recent history
+- Review archived sessions when context is needed from older work
+- Update session counter in frontmatter after each development session
+
 ---
 
 **Happy Coding!**
