@@ -75,6 +75,7 @@ When starting a task with `estimated_hours > 12`:
 3. **Testing** (2-4h)
    - Unit tests
    - Integration tests
+   - **Document Pain Points:** Record any frustration/slowness
    - Edge cases
    - Error handling
 

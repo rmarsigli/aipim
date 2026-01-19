@@ -209,6 +209,26 @@ test('user can do Y', function () {
 **Lessons:**
 1. 
 
+## Pain Points (During Testing)
+
+### Category: Performance
+- [ ] Feature X too slow (>5s response time)
+  **Impact:** High - blocks user workflow
+  **Frequency:** Every request
+  **Action:** → Create task for optimization
+
+### Category: UX Issues
+- [ ] Error messages unclear
+  **Impact:** Medium - confuses users
+  **Frequency:** Occasional
+  **Action:** → Create task for better error handling
+
+### Category: Technical Debt
+- [ ] Code duplication in Y and Z modules
+  **Impact:** Low - maintenance burden
+  **Frequency:** N/A
+  **Action:** → Create refactoring task
+
 ## Completion
 
 - [ ] All DoD checked

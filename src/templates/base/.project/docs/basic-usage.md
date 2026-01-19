@@ -26,7 +26,11 @@
     -   Update checkboxes in `current-task.md` as you go.
     -   Commit frequently.
 
-3.  **Complete it:**
+3.  **Pain-Driven Development:**
+    -   Found a bug/annoyance? Add it to "Pain Points" in `current-task.md`.
+    -   Convert to tasks: `.project/scripts/pain-to-tasks.sh` (High Impact = P1)
+
+4.  **Complete it:**
     ```bash
     # Archive the task
     mv .project/current-task.md .project/completed/$(date +%Y-%m-%d)-T001-setup.md
