@@ -3,7 +3,7 @@ import { doctor } from '@/core/doctor.js'
 import chalk from 'chalk'
 
 export async function validate(): Promise<void> {
-    logger.info('Validating AIPM environment...')
+    logger.info('Validating AIPIM environment...')
 
     // We pass process.cwd() as the root to check
     const results = await doctor.diagnose(process.cwd())

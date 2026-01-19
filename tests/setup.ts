@@ -5,7 +5,7 @@ import { jest, beforeAll, afterAll } from '@jest/globals'
 
 export const createTempDir = async (): Promise<string> => {
     const uniqueId = Math.random().toString(36).substring(2, 9)
-    const tempDir = path.join(os.tmpdir(), `aipm-test-${Date.now()}-${uniqueId}`)
+    const tempDir = path.join(os.tmpdir(), `aipim-test-${Date.now()}-${uniqueId}`)
     await fs.ensureDir(tempDir)
     return tempDir
 }

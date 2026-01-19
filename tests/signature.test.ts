@@ -8,8 +8,8 @@ describe('SignatureManager', () => {
         const signed = signatureManager.sign(content)
         
         expect(signed).toContain(content)
-        expect(signed).toContain('<!-- @aipm-signature:')
-        expect(signed).toContain('<!-- @aipm-version:')
+        expect(signed).toContain('<!-- @aipim-signature:')
+        expect(signed).toContain('<!-- @aipim-version:')
     })
 
     test('verifies pristine content', () => {
@@ -49,7 +49,7 @@ describe('SignatureManager', () => {
         expect(signatureManager.verify(resigned)).toBe('pristine')
         
         // Verify it didn't append double signatures
-        const matches = resigned.match(/@aipm-signature/g)
+        const matches = resigned.match(/@aipim-signature/g)
         expect(matches).toHaveLength(1)
     })
 })

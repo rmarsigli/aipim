@@ -48,7 +48,7 @@ export async function update(options: UpdateOptions = {}): Promise<void> {
         return
     }
 
-    spinner.start('Updating AIPM...')
+    spinner.start('Updating AIPIM...')
 
     try {
         const results = await updater.update(process.cwd(), config)

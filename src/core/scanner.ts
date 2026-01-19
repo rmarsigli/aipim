@@ -13,7 +13,7 @@ export class ProjectScanner {
     /**
      * Scans the project directory and classifies specific files.
      * @param projectRoot The root of the project (where node_modules/package.json usually are)
-     * @param filesToScan List of relative paths to scan (optional, defaults to standard AIPM files)
+     * @param filesToScan List of relative paths to scan (optional, defaults to standard AIPIM files)
      */
     public async scan(projectRoot: string, filesToScan?: string[]): Promise<FileScanResult[]> {
         const results: FileScanResult[] = []

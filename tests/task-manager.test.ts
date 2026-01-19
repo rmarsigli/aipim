@@ -25,7 +25,7 @@ describe('TaskManager', () => {
         
         const content = await fs.readFile(filePath, 'utf-8')
         expect(content).toContain('feat: User Login')
-        expect(content).toContain('<!-- @aipm-signature:')
+        expect(content).toContain('<!-- @aipim-signature:')
     })
 
     test('increments task ID', async () => {

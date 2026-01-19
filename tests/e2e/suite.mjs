@@ -1,5 +1,5 @@
 /**
- * AIPM Comprehensive E2E Test Suite
+ * AIPIM Comprehensive E2E Test Suite
  * Covers 30+ scenarios for Install, Update, Doctor, and Task commands.
  * Run with: node lab/suite.mjs
  */
@@ -81,7 +81,7 @@ async function test(name, fn) {
 // ==========================================
 
 async function main() {
-    log('Starting AIPM Comprehensive Test Suite (30 Scenarios)\n')
+    log('Starting AIPIM Comprehensive Test Suite (30 Scenarios)\n')
     setup()
 
     // --- INSTALLATION (6 Tests) ---

@@ -1,14 +1,14 @@
 ---
 title: "Extract Parsing Utilities to Dedicated Module"
 created: 2026-01-19T02:00:00-03:00
-last_updated: 2026-01-19T02:00:00-03:00
+last_updated: 2026-01-19T16:30:00-03:00
 priority: P2-M
 estimated_hours: 3
-actual_hours: 0
-status: backlog
+actual_hours: 1.5
+status: completed
 blockers: []
 tags: [refactor, architecture, code-quality]
-related_files: [src/commands/resume.ts, src/commands/start.ts, src/utils/parser.ts]
+related_files: [src/commands/resume.ts, src/utils/context.ts, tests/utils/context.test.ts]
 ---
 
 # Task: Extract Parsing Utilities to Dedicated Module (T020)
@@ -299,3 +299,73 @@ src/utils/
 
 **Completed:** ___________
 **Final time:** _____ hours
+
+
+## Completion Summary
+
+**Status:** ✅ COMPLETED  
+**Actual Time:** 1.5h (estimated: 3h, 50% under estimate!)  
+**Completed:** 2026-01-19T16:30:00-03:00
+
+### What Was Accomplished
+
+**Phase 1: Centralized Parsing Module** ✅
+- Added 3 new functions to utils/context.ts (calculateProgress, extractCheckpoints, extractObjective)
+- Functions already existed for parseContext and parseTask
+- Total: 5 core parsing functions now centralized
+
+**Phase 2: Refactored Commands** ✅
+- Updated resume.ts to import from utils/context.ts
+- Removed 144 lines of duplicate parsing code
+- start.ts was already using centralized functions (no changes needed)
+
+**Phase 3: Comprehensive Testing** ✅
+- Created tests/utils/context.test.ts with 25 tests
+- 100% test pass rate (25/25 passing)
+- All edge cases covered (empty files, invalid data, missing fields)
+- Overall test suite: 88 tests passing, 84.63% coverage
+
+**Phase 4: Verification** ✅
+- Build successful (`pnpm build`)
+- All 88 tests pass (`pnpm test`)
+- Manual verification: both `start` and `resume` commands work perfectly
+- No regressions detected
+
+### Key Metrics
+
+- **Code Reduction:** 144 lines of duplicate code removed
+- **Test Coverage:** 25 new tests added, all passing
+- **Build Time:** No performance degradation
+- **Commands Verified:** start ✅, resume ✅
+
+### Files Changed
+
+- `src/utils/context.ts`: +95 lines (new functions)
+- `src/commands/resume.ts`: -144 lines (removed duplicates, +1 import)
+- `tests/utils/context.test.ts`: +445 lines (new test file)
+
+### Retrospective
+
+**Went Well:**
+- Discovered that start.ts was already using centralized functions
+- Found and fixed a bug in calculateProgress (case sensitivity)
+- Tests caught edge cases we hadn't considered
+- All commands work perfectly after refactoring
+
+**Challenges:**
+- Had to reconcile slight differences between resume.ts and context.ts versions
+- Test failures revealed regex bugs that needed fixing
+- Coverage threshold warning (expected - testing only parser functions)
+
+**Lessons Learned:**
+1. Always check existing code before assuming duplication
+2. Comprehensive tests catch subtle bugs early
+3. Refactoring is easier when you have good tests
+4. DRY principle significantly reduces maintenance burden
+
+**Estimate Accuracy:** 1.5h actual vs 3h estimated = 50% faster (excellent!)
+
+---
+
+**Task unblocks:** T022 (Add command tests) - parsing utilities now centralized and tested
+

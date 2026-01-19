@@ -10,8 +10,8 @@ interface FileMetadata {
 }
 
 export class SignatureManager {
-    private static readonly SIG_PREFIX = '<!-- @aipm-signature:'
-    private static readonly VER_PREFIX = '<!-- @aipm-version:'
+    private static readonly SIG_PREFIX = '<!-- @aipim-signature:'
+    private static readonly VER_PREFIX = '<!-- @aipim-version:'
 
     public sign(content: string, _strategy: string = 'overwrite-if-unchanged'): string {
         const cleanContent = this.stripMetadata(content)
