@@ -28,6 +28,11 @@ export async function start(options: StartOptions = {}): Promise<void> {
     const cwd = process.cwd()
     const projectDir = join(cwd, '.project')
 
+    // Default to copy if no other output option is specified
+    if (!options.print && !options.file && options.copy === undefined) {
+        options.copy = true
+    }
+
     // Check if .project exists
     if (!existsSync(projectDir)) {
         logger.error('No .project directory found. Run `aipim install` first.')

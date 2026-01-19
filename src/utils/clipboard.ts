@@ -1,5 +1,26 @@
-import { execSync } from 'child_process'
+import { spawn } from 'child_process'
 import { logger } from '@/utils/logger.js'
+
+/**
+ * Helper to run command with input
+ */
+function runWithInput(command: string, args: string[], input: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const proc = spawn(command, args)
+
+        proc.on('error', (err) => reject(err))
+
+        proc.on('close', (code) => {
+            if (code === 0) resolve()
+            else reject(new Error(`Command ${command} failed with code ${code}`))
+        })
+
+        if (proc.stdin) {
+            proc.stdin.write(input)
+            proc.stdin.end()
+        }
+    })
+}
 
 /**
  * Copies text to the system clipboard.
@@ -21,20 +42,20 @@ export async function copyToClipboard(text: string): Promise<boolean> {
             const platform = process.platform
             if (platform === 'darwin') {
                 // macOS
-                execSync('pbcopy', { input: text })
+                await runWithInput('pbcopy', [], text)
                 return true
             } else if (platform === 'linux') {
                 // Try xclip first, then xsel
                 try {
-                    execSync('xclip -selection clipboard', { input: text })
+                    await runWithInput('xclip', ['-selection', 'clipboard'], text)
                     return true
                 } catch {
-                    execSync('xsel --clipboard --input', { input: text })
+                    await runWithInput('xsel', ['--clipboard', '--input'], text)
                     return true
                 }
             } else if (platform === 'win32') {
                 // Windows
-                execSync('clip', { input: text })
+                await runWithInput('clip', [], text)
                 return true
             }
         } catch (nativeError) {

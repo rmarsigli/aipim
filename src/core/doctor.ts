@@ -17,7 +17,7 @@ export class Doctor {
         const results: CheckResult[] = []
 
         // 1. Check Project Structure
-        results.push(await this.checkStructure(projectRoot))
+        results.push(await this.checkStructure(path.join(projectRoot, FILES.PROJECT_DIR)))
 
         // 2. Check Permissions (Scripts)
         results.push(...(await this.checkPermissions(projectRoot)))

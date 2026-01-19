@@ -2,18 +2,20 @@ import { taskManager } from '../src/core/task-manager.js'
 import { createTempDir, cleanupTempDir } from './setup.js'
 import fs from 'fs-extra'
 import path from 'path'
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals'
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals'
 
 describe('TaskManager', () => {
     let tempDir: string
 
     beforeEach(async () => {
         tempDir = await createTempDir()
+        jest.spyOn(process, 'cwd').mockReturnValue(tempDir)
         // Setup base structure
         await fs.ensureDir(path.join(tempDir, '.project/backlog'))
     })
 
     afterEach(async () => {
+        jest.restoreAllMocks()
         await cleanupTempDir(tempDir)
     })
 

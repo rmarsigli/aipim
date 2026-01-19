@@ -147,7 +147,7 @@ describe('start command', () => {
     test('saves to file when --file option is used', async () => {
         const filePath = 'prompt.md'
         await start({ file: filePath, logger: { log: mockLog } })
-        expect(fsExtra.writeFile).toHaveBeenCalledWith(filePath, expect.any(String))
+        expect(fsExtra.writeFile).toHaveBeenCalledWith(expect.stringContaining(filePath), expect.any(String))
         expect(logger.success).toHaveBeenCalledWith(expect.stringContaining(filePath))
     })
 

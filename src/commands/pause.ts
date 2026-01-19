@@ -1,11 +1,8 @@
 import { Command } from 'commander'
 import fs from 'fs'
 import path from 'path'
-import { exec } from 'child_process'
-import util from 'util'
 import { confirm } from '@inquirer/prompts'
-
-const execAsync = util.promisify(exec)
+import { git } from '@/utils/git.js'
 
 export const pause = new Command()
     .name('pause')
@@ -23,7 +20,7 @@ export const pause = new Command()
 
         try {
             // 1. Capture Git Status
-            const { stdout: gitStatus } = await execAsync('git status --porcelain')
+            const gitStatus = await git(['status', '--porcelain'])
             const isDirty = gitStatus.length > 0
 
             // 2. Capture Current Task Info
@@ -57,7 +54,8 @@ export const pause = new Command()
 
                 if (stash) {
                     console.log('🔄 Stashing changes...')
-                    await execAsync(`git stash push -m "Paused: ${reason}"`)
+                    console.log('🔄 Stashing changes...')
+                    await git(['stash', 'push', '-m', `Paused: ${reason}`])
                     snapshot.git.stash_hash = 'latest'
                     console.log('✅ Changes stashed.')
                 }

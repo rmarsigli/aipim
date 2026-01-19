@@ -2,16 +2,18 @@ import { doctor } from '../src/core/doctor.js'
 import { createTempDir, cleanupTempDir } from './setup.js'
 import fs from 'fs-extra'
 import path from 'path'
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals'
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals'
 
 describe('Doctor', () => {
     let tempDir: string
 
     beforeEach(async () => {
         tempDir = await createTempDir()
+        jest.spyOn(process, 'cwd').mockReturnValue(tempDir)
     })
 
     afterEach(async () => {
+        jest.restoreAllMocks()
         await cleanupTempDir(tempDir)
     })
 

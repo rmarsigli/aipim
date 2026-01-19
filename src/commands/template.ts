@@ -189,8 +189,19 @@ Variables available:
 async function openEditor(filePath: string): Promise<void> {
     const editor = process.env.EDITOR || 'code' // Default to code or system editor
     try {
-        const { exec } = await import('child_process')
-        exec(`${editor} "${filePath}"`)
+        const { spawn } = await import('child_process')
+
+        // Handle editors with args (e.g. "code --wait")
+        const parts = editor.split(' ')
+        const cmd = parts[0]
+        const args = parts.slice(1).concat([filePath])
+
+        const proc = spawn(cmd, args, {
+            stdio: 'inherit',
+            detached: true
+        })
+
+        proc.unref() // Let it run independently
         logger.info(`Opened ${filePath} in ${editor}`)
     } catch {
         logger.error(`Failed to open editor ${editor}`)
