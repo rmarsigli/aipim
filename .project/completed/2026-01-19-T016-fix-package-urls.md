@@ -1,11 +1,11 @@
 ---
 title: "Fix package.json URLs (aipm → aipim)"
 created: 2026-01-19T02:00:00-03:00
-last_updated: 2026-01-19T02:00:00-03:00
+completed: 2026-01-19T04:10:00-03:00
 priority: P1-S
 estimated_hours: 0.25
-actual_hours: 0
-status: backlog
+actual_hours: 0.25
+status: completed
 blockers: []
 tags: [bugfix, naming, urgent]
 related_files: [package.json]
