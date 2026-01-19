@@ -12,8 +12,11 @@ export interface FileScanResult {
 export class ProjectScanner {
     /**
      * Scans the project directory and classifies specific files.
-     * @param projectRoot The root of the project (where node_modules/package.json usually are)
-     * @param filesToScan List of relative paths to scan (optional, defaults to standard AIPIM files)
+     * Verifies file integrity using signatures and identifies missing or legacy files.
+     *
+     * @param projectRoot - The root of the project (typically containing package.json)
+     * @param filesToScan - List of relative paths to scan (optional, defaults to standard AIPIM files)
+     * @returns Array of scan results including validity status
      */
     public async scan(projectRoot: string, filesToScan?: string[]): Promise<FileScanResult[]> {
         const results: FileScanResult[] = []

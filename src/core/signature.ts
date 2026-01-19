@@ -13,6 +13,14 @@ export class SignatureManager {
     private static readonly SIG_PREFIX = '<!-- @aipim-signature:'
     private static readonly VER_PREFIX = '<!-- @aipim-version:'
 
+    /**
+     * Signs the content by appending a signature and version.
+     * Calculated using SHA-256 of the content (excluding existing metadata).
+     *
+     * @param content - The file content to sign
+     * @param _strategy - Signing strategy (reserved for future use)
+     * @returns The content with appended metadata footer
+     */
     public sign(content: string, _strategy: string = 'overwrite-if-unchanged'): string {
         const cleanContent = this.stripMetadata(content)
         const hash = this.calculateHash(cleanContent)
@@ -28,6 +36,10 @@ ${SignatureManager.VER_PREFIX} ${version} -->
 
     /**
      * Verifies if the file content matches its embedded signature.
+     * checks if the calculated hash of the content matches the stored signature.
+     *
+     * @param content - The raw file content to verify
+     * @returns 'pristine' if match, 'modified' if mismatch, 'legacy' if no signature, 'missing' if file missing
      */
     public verify(content: string): FileStatus {
         const metadata = this.extractMetadata(content)

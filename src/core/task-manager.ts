@@ -14,10 +14,16 @@ export interface TaskConfig {
 
 export class TaskManager {
     /**
-     * Initializes a new task.
-     * 1. Calculates next ID
-     * 2. Creates task file from template
-     * 3. Updates backlog.md
+     * Initializes a new task in the project backlog.
+     *
+     * 1. Calculates the next available Task ID.
+     * 2. Creates a new task file from the standard template.
+     * 3. Updates the backlog index file.
+     * 4. Signs the generated files.
+     *
+     * @param projectRoot - The root directory of the project
+     * @param config - Task configuration (type and name)
+     * @returns The absolute path to the created task file
      */
     public async initTask(projectRoot: string, config: TaskConfig): Promise<string> {
         const projectDir = path.join(projectRoot, FILES.PROJECT_DIR)

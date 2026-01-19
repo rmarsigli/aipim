@@ -13,8 +13,12 @@ const __dirname = path.dirname(__filename)
 /**
  * Installs the project configuration and generates prompt files.
  *
+ * 1. Creates .project directory structure.
+ * 2. Generates AI-specific prompt files (e.g., CLAUDE.md) based on templates.
+ * 3. Makes utility scripts executable.
+ *
  * @param config - The installation configuration (AI tools, guidelines, etc.)
- * @param _detected - The detected project details (unused in current logic but kept for interface consistency)
+ * @param _detected - The detected project details (interface consistency)
  * @throws Error if templates directory is missing or file operations fail
  */
 export async function installProject(config: InstallConfig, _detected: DetectedProject): Promise<void> {
@@ -154,7 +158,11 @@ async function makeScriptsExecutable(dryRun?: boolean): Promise<void> {
 
 /**
  * Creates a backup of the .project directory.
- * @returns The path to the backup directory or null if dry run/no backup needed
+ * Backups are stored in `.project-backups/YYYY-MM-DD-HH-MM-SS`.
+ *
+ * @param projectRoot - The root directory of the project
+ * @param dryRun - If true, only simulates the backup
+ * @returns The path to the created backup directory or null if dry run/no backup needed
  */
 export async function createBackup(projectRoot: string, dryRun?: boolean): Promise<string | null> {
     const projectDir = path.join(projectRoot, FILES.PROJECT_DIR)

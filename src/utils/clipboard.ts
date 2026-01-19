@@ -1,6 +1,13 @@
 import { execSync } from 'child_process'
 import { logger } from '@/utils/logger.js'
 
+/**
+ * Copies text to the system clipboard.
+ * Tries `clipboardy` first, then falls back to native OS commands (pbcopy, xclip, clip).
+ *
+ * @param text - Text to copy
+ * @returns true if successful, false otherwise
+ */
 export async function copyToClipboard(text: string): Promise<boolean> {
     try {
         // Try clipboardy (cross-platform clipboard library)

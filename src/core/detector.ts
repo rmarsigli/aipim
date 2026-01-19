@@ -72,6 +72,12 @@ async function filterExistingFiles(cwd: string, files: string[]): Promise<string
     return existing
 }
 
+/**
+ * Returns the human-readable display name for a framework ID.
+ *
+ * @param frameworkId - The framework identifier (e.g., 'next-js')
+ * @returns The display name (e.g., 'Next.js') or the ID if not found
+ */
 export function getFrameworkDisplayName(frameworkId: string | null): string {
     if (!frameworkId) return ''
     return FRAMEWORKS.find((f) => f.id === frameworkId)?.name || frameworkId

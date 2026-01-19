@@ -1,6 +1,9 @@
 import fs from 'fs'
 import path from 'path'
 
+/**
+ * Represents a task node in the dependency graph.
+ */
 export interface TaskNode {
     id: string
     title: string
@@ -10,11 +13,20 @@ export interface TaskNode {
     path: string
 }
 
+/**
+ * Represents the entire dependency graph including nodes and detected cycles.
+ */
 export interface DependencyGraph {
     nodes: Map<string, TaskNode>
     cycles: string[][]
 }
 
+/**
+ * Retrieves all tasks from the project (current, backlog, completed).
+ *
+ * @param projectDir - The root directory of the project
+ * @returns Array of all found tasks
+ */
 export function getAllTasks(projectDir: string): TaskNode[] {
     const tasks: TaskNode[] = []
 
@@ -139,6 +151,13 @@ function parseFrontmatter(content: string): Record<string, any> {
     return frontmatter
 }
 
+/**
+ * Builds a dependency graph from a list of tasks.
+ * Detects cycles and identifies blocked tasks.
+ *
+ * @param tasks - The list of tasks to process
+ * @returns The built dependency graph
+ */
 export function buildGraph(tasks: TaskNode[]): DependencyGraph {
     const nodes = new Map<string, TaskNode>()
     tasks.forEach((t) => nodes.set(t.id, t))

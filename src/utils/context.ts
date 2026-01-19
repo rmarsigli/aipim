@@ -2,6 +2,10 @@ import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { gitBranch, gitLog } from './git.js'
 
+/**
+ * Gets the project name from package.json or falls back to directory name.
+ * @param cwd - Current working directory
+ */
 export function getProjectName(cwd: string): string {
     const packageJsonPath = join(cwd, 'package.json')
     if (existsSync(packageJsonPath)) {
@@ -15,10 +19,16 @@ export function getProjectName(cwd: string): string {
     return cwd.split('/').pop() || 'Unknown'
 }
 
+/**
+ * Gets the current git branch name.
+ */
 export async function getCurrentBranch(cwd: string): Promise<string> {
     return gitBranch(cwd).then((b) => b || 'N/A')
 }
 
+/**
+ * Gets the most recent commits formatted as hash and message.
+ */
 export async function getRecentCommits(cwd: string, count: number): Promise<Array<{ hash: string; message: string }>> {
     const output = await gitLog(count, '%h||%s', cwd)
     if (!output) return []
@@ -31,6 +41,12 @@ export async function getRecentCommits(cwd: string, count: number): Promise<Arra
         })
 }
 
+/**
+ * Parses the context.md file content.
+ * Extracts frontmatter, current state, and next action.
+ *
+ * @param content - Raw content of context.md
+ */
 export function parseContext(content: string): {
     frontmatter: Record<string, unknown>
     currentState: string
@@ -90,6 +106,10 @@ export function parseContext(content: string): {
     return { frontmatter, currentState, nextAction }
 }
 
+/**
+ * Parses a task markdown file.
+ * Extracts title, estimated/actual hours, status, and current phase.
+ */
 export function parseTask(content: string): {
     title: string
     estimated_hours: string
@@ -125,11 +145,17 @@ export function parseTask(content: string): {
     return { title, estimated_hours, actual_hours, status, currentPhase }
 }
 
+/**
+ * Extracts the title from an ADR content.
+ */
 export function extractADRTitle(content: string): string {
     const match = content.match(/^# (.+)$/m)
     return match ? match[1] : 'No title'
 }
 
+/**
+ * Gets recent ADRs (decisions).
+ */
 export function getRecentDecisions(projectDir: string, count: number): Array<{ file: string; title: string }> {
     const decisionsDir = join(projectDir, 'decisions')
     if (existsSync(decisionsDir)) {
@@ -153,6 +179,9 @@ export function getRecentDecisions(projectDir: string, count: number): Array<{ f
     return []
 }
 
+/**
+ * Calculates progress from checkboxes in content.
+ */
 export function calculateProgress(content: string): {
     completed: number
     total: number
@@ -166,6 +195,9 @@ export function calculateProgress(content: string): {
     return { completed, total, percentage }
 }
 
+/**
+ * Extracts checkpoints (last 3 completed, current, next).
+ */
 export function extractCheckpoints(content: string): {
     lastCompleted: string[]
     current: string | null
@@ -200,6 +232,9 @@ export function extractCheckpoints(content: string): {
     return { lastCompleted, current, next }
 }
 
+/**
+ * Extracts the objective from the task file.
+ */
 export function extractObjective(content: string): string {
     const lines = content.split('\n')
     let inObjective = false
