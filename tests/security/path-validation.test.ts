@@ -20,7 +20,10 @@ jest.unstable_mockModule('fs-extra', () => ({
 }))
 
 describe('Path Validator', () => {
-    const projectRoot = '/home/user/project'
+    // Use OS-specific project root to avoid Windows drive letter issues
+    const projectRoot = process.platform === 'win32'
+        ? 'C:\\Users\\user\\project'
+        : '/home/user/project'
     let validatePath: any
     let validatePathSafe: any
     let SecurityError: any
