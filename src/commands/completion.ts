@@ -22,9 +22,9 @@ function generateBashCompletion(program: Command): string {
 
     // Basic bash completion script
     return `
-# aipm bash completion
+# aipim bash completion
 
-_aipm_completion() {
+_aipim_completion() {
     local cur prev
     cur="\${COMP_WORDS[COMP_CWORD]}"
     prev="\${COMP_WORDS[COMP_CWORD-1]}"
@@ -45,12 +45,12 @@ _aipm_completion() {
         .join('')}
 
     # Main command completion
-    if [[ "$prev" == "aipm" ]]; then
+    if [[ "$prev" == "aipim" ]]; then
         COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
         return 0
     fi
 }
 
-complete -F _aipm_completion aipm
+complete -F _aipim_completion aipim
 `
 }
