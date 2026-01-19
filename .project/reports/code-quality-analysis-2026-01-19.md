@@ -176,7 +176,7 @@ AIPIM is a **well-structured CLI tool** with solid TypeScript practices and good
 
 1. **diff.ts is non-functional**: The command exists but does nothing. Should be implemented or removed to avoid user confusion.
 
-2. **Package.json URLs incorrect**: 
+2. **Package.json URLs incorrect**:
    - `homepage`: `https://github.com/rmarsigli/aipm` should be `https://github.com/rmarsigli/aipim`
    - `bugs.url`: Same issue
 
@@ -203,50 +203,50 @@ AIPIM demonstrates **production-ready quality** for a v1.x release. The codebase
 
 ---
 
-# Veredito Final: Pronto para 1.2.0?
+# Final Verdict: Ready for 1.2.0?
 
-## ⚠️ **NÃO RECOMENDADO** para lançamento imediato da versão 1.2.0
+## ⚠️ **NOT RECOMMENDED** for immediate release of version 1.2.0
 
-### Justificativa
+### Rationale
 
-Embora o projeto tenha uma **pontuação geral sólida de 80.6/100**, existem **bloqueadores técnicos** que precisam ser resolvidos antes de um bump de versão minor:
+Although the project has a **solid overall score of 80.6/100**, there are **technical blockers** that must be resolved before a minor version bump:
 
-#### Bloqueadores (Must Fix)
+#### Blockers (Must Fix)
 
-| Issue | Severidade | Esforço |
-|-------|------------|---------|
-| `diff.ts` é stub não funcional | Alta | Médio |
-| URLs incorretas no package.json | Média | Baixo |
-| completion.ts usa nome errado (`aipm`) | Média | Baixo |
-| Código truncado em resume.ts | Alta | Médio |
+| Issue | Severity | Effort |
+|------|----------|--------|
+| `diff.ts` is a non-functional stub | High | Medium |
+| Incorrect URLs in package.json | Medium | Low |
+| completion.ts uses wrong binary name (`aipm`) | Medium | Low |
+| Truncated code in resume.ts | High | Medium |
 
-#### Recomendações
+#### Recommendations
 
-**Para 1.1.3 (Patch Release):**
-1. ✅ Corrigir URLs no package.json
-2. ✅ Corrigir nome do binário em completion.ts
-3. ✅ Verificar e completar resume.ts
+**For 1.1.3 (Patch Release):**
+1. ✅ Fix URLs in package.json
+2. ✅ Fix binary name in completion.ts
+3. ✅ Verify and complete resume.ts
 
-**Para 1.2.0 (Minor Release):**
-1. Implementar comando `diff` completamente OU removê-lo do CLI
-2. Adicionar Jest coverage reporting com threshold de 80%
-3. Adicionar testes para comandos faltantes (start, resume, template)
-4. Documentar API pública com JSDoc
+**For 1.2.0 (Minor Release):**
+1. Fully implement the `diff` command OR remove it from the CLI
+2. Add Jest coverage reporting with an 80% threshold
+3. Add tests for missing commands (start, resume, template)
+4. Document the public API with JSDoc
 
-### Checklist para 1.2.0
+### 1.2.0 Checklist
 
-- [ ] Todos os comandos CLI funcionam corretamente
-- [ ] Zero stubs ou código incompleto
-- [ ] Coverage de testes ≥ 80%
-- [ ] Todos os URLs e referências ao projeto corretos
-- [ ] Changelog atualizado
+- [ ] All CLI commands work correctly
+- [ ] Zero stubs or incomplete code
+- [ ] Test coverage ≥ 80%
+- [ ] All project URLs and references are correct
+- [ ] Changelog updated
 
-### Conclusão
+### Conclusion
 
-O projeto está **a 2-3 dias de trabalho** de estar pronto para 1.2.0. Recomendo:
+The project is **2–3 days of work away** from being ready for 1.2.0. Recommendation:
 
-1. **Lançar 1.1.3** com os fixes urgentes (URLs, completion.ts)
-2. **Planejar sprint** para completar diff.ts e melhorar cobertura
-3. **Lançar 1.2.0** após passar no checklist acima
+1. **Release 1.1.3** with urgent fixes (URLs, completion.ts)
+2. **Plan a sprint** to complete diff.ts and improve coverage
+3. **Release 1.2.0** after passing the checklist above
 
-**Status: 🟡 QUASE PRONTO** — Corrigir bloqueadores antes do release.
+**Status: 🟡 ALMOST READY** — Fix blockers before release.
