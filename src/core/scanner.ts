@@ -36,15 +36,12 @@ export class ProjectScanner {
             try {
                 absolutePath = validatePath(absolutePath, projectRoot)
             } catch {
-                // If path is invalid/outside root, mark as missing or handle error
-                // For scanner, maybe just ignore or mark invalid?
-                // Let's mark as missing but log debug if possible?
-                // actually if it throws security error, we probably shouldn't scan it.
-                // But we need to return a result.
+                // Path validation failed (likely path traversal attempt)
+                // Treat as missing/invalid and return safe result
                 return {
-                    path: path.join(projectRoot, relativePath), // Unsafe path for report
+                    path: path.join(projectRoot, relativePath),
                     relativePath,
-                    status: 'missing' as FileStatus // Treat traversal attempts as missing/invalid
+                    status: 'missing' as FileStatus
                 }
             }
 
