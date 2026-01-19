@@ -47,4 +47,16 @@ For complex features (>500 lines of code or complex business logic), use the **F
 3.  **Implement:**
     Ask the AI: "Implement the feature based on .project/docs/features/my-feature.md".
 
-*See [.project/docs/patterns/feature-first-documentation.md](patterns/feature-first-documentation.md) for full details.*
+## Code Quality Analyzer
+
+To ensure technical debts don't accumulate, run a quality check before finishing a session.
+
+```bash
+# Generate a brutally honest quality report prompt
+.project/scripts/analyze-quality.sh --manual
+```
+
+1.  Copy the output prompt.
+2.  Send to AI.
+3.  Save result to `.project/quality-reports/YYYY-MM-DD.md`.
+

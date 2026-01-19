@@ -133,7 +133,8 @@ async function makeScriptsExecutable(dryRun?: boolean): Promise<void> {
     const scripts = [
         '.project/scripts/pre-session.sh',
         '.project/scripts/validate-dod.sh',
-        '.project/scripts/backlog-health.sh'
+        '.project/scripts/backlog-health.sh',
+        '.project/scripts/analyze-quality.sh'
     ]
 
     await Promise.all(
