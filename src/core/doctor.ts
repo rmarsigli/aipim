@@ -1,6 +1,8 @@
 import fs from 'fs-extra'
 import path from 'path'
-import { PROJECT_STRUCTURE, FILES } from '@/constants.js'
+import { FILES, PROJECT_STRUCTURE } from '@/constants.js'
+import { logger } from '@/utils/logger.js'
+import { validatePath } from '@/utils/path-validator.js'
 import { projectScanner } from './scanner.js'
 
 export interface CheckResult {
@@ -26,15 +28,16 @@ export class Doctor {
         return results
     }
 
-    private async checkStructure(root: string): Promise<CheckResult> {
-        const projectDir = path.join(root, FILES.PROJECT_DIR)
-        if (!(await fs.pathExists(projectDir))) {
+    public async checkStructure(projectDir: string): Promise<CheckResult> {
+        const safeProjectDir = validatePath(projectDir)
+        if (!(await fs.pathExists(safeProjectDir))) {
+            logger.error(`Project directory not found: ${safeProjectDir}`)
             return { id: 'structure', name: 'Project Structure', status: 'fail', message: '.project directory missing' }
         }
 
         const missing = []
         for (const dir of PROJECT_STRUCTURE) {
-            if (!(await fs.pathExists(path.join(projectDir, dir)))) {
+            if (!(await fs.pathExists(path.join(safeProjectDir, dir)))) {
                 missing.push(dir)
             }
         }

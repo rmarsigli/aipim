@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { getTemplateVariables, renderTemplate } from '@/utils/template-engine.js'
 import { copyToClipboard } from '@/utils/clipboard.js'
+import { validatePath } from '@/utils/path-validator.js'
 import chalk from 'chalk'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -158,7 +159,9 @@ async function createCustomTemplate(projectDir: string, name: string): Promise<v
     // Ensure .project/prompts exists
     if (!existsSync(userDir)) {
         const fs = await import('fs-extra')
-        await fs.ensureDir(userDir)
+        const safeUserDir = validatePath(userDir)
+        await fs.ensureDir(safeUserDir)
+        logger.info(`Created templates directory: ${safeUserDir}`)
     }
 
     const filePath = join(userDir, name.endsWith('.md') ? name : name + '.md')

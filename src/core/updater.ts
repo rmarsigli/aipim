@@ -7,6 +7,7 @@ import { InstallConfig } from '@/types/index.js'
 import fs from 'fs-extra'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { validatePath } from '@/utils/path-validator.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -88,8 +89,9 @@ export class Updater {
             const signedContent = signatureManager.sign(newContent)
 
             if (!config.dryRun) {
-                await fs.ensureDir(path.dirname(scan.path))
-                await fs.writeFile(scan.path, signedContent, 'utf-8')
+                const safeScanPath = validatePath(scan.path)
+                await fs.ensureDir(path.dirname(safeScanPath))
+                await fs.writeFile(safeScanPath, signedContent, 'utf-8')
             }
 
             return {

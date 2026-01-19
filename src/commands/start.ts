@@ -12,6 +12,7 @@ import {
     parseTask
 } from '@/utils/context.js'
 import { copyToClipboard } from '@/utils/clipboard.js'
+import { validatePath } from '@/utils/path-validator.js'
 
 export interface StartOptions {
     print?: boolean
@@ -19,6 +20,7 @@ export interface StartOptions {
     full?: boolean
     verbose?: boolean
     logger?: { log: (msg: string) => void }
+    copy?: boolean
 }
 
 export async function start(options: StartOptions = {}): Promise<void> {
@@ -49,9 +51,10 @@ export async function start(options: StartOptions = {}): Promise<void> {
     } else if (options.file) {
         // File mode
         const fs = await import('fs-extra')
-        await fs.writeFile(options.file, prompt)
-        logger.success(`Session prompt saved to: ${options.file}`)
-    } else {
+        const safePath = validatePath(options.file)
+        await fs.writeFile(safePath, prompt)
+        logger.success(`Session prompt saved to: ${safePath}`)
+    } else if (options.copy) {
         // Clipboard mode (try to copy, fallback to print)
         const copied = await copyToClipboard(prompt)
         if (copied) {

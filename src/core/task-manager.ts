@@ -1,8 +1,10 @@
 import fs from 'fs-extra'
 import path from 'path'
 import { FILES } from '@/constants.js'
+
 import { signatureManager } from './signature.js'
 import { fileURLToPath } from 'url'
+import { validatePath } from '@/utils/path-validator.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -59,12 +61,13 @@ export class TaskManager {
 
         // Sign it
         const signedContent = signatureManager.sign(content)
-        await fs.writeFile(filePath, signedContent, 'utf-8')
+        const safeFilePath = validatePath(filePath)
+        await fs.writeFile(safeFilePath, signedContent, 'utf-8')
 
         // 3. Update backlog.md
         await this.updateBacklogIndex(projectRoot, { id: nextId, type: config.type, name: config.name, filename })
 
-        return filePath
+        return safeFilePath
     }
 
     private async getNextId(backlogDir: string): Promise<string> {
@@ -110,7 +113,8 @@ export class TaskManager {
         }
 
         const signedContent = signatureManager.sign(content)
-        await fs.writeFile(backlogFile, signedContent, 'utf-8')
+        const safeBacklogFile = validatePath(backlogFile)
+        await fs.writeFile(safeBacklogFile, signedContent, 'utf-8')
     }
 
     private resolveTemplatesDir(): string {

@@ -2,6 +2,7 @@ import fs from 'fs-extra'
 import path from 'path'
 import { signatureManager, FileStatus } from './signature.js'
 import { FILES } from '@/constants.js'
+import { validatePath } from '@/utils/path-validator.js'
 
 export interface FileScanResult {
     path: string
@@ -31,7 +32,22 @@ export class ProjectScanner {
         ]
 
         const tasks = targets.map(async (relativePath) => {
-            const absolutePath = path.join(projectRoot, relativePath)
+            let absolutePath = path.join(projectRoot, relativePath)
+            try {
+                absolutePath = validatePath(absolutePath, projectRoot)
+            } catch {
+                // If path is invalid/outside root, mark as missing or handle error
+                // For scanner, maybe just ignore or mark invalid?
+                // Let's mark as missing but log debug if possible?
+                // actually if it throws security error, we probably shouldn't scan it.
+                // But we need to return a result.
+                return {
+                    path: path.join(projectRoot, relativePath), // Unsafe path for report
+                    relativePath,
+                    status: 'missing' as FileStatus // Treat traversal attempts as missing/invalid
+                }
+            }
+
             let status: FileStatus = 'missing'
 
             if (await fs.pathExists(absolutePath)) {
