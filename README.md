@@ -15,7 +15,7 @@
 AIPIM acts as the interface layer between your project and your AI coding assistant (Claude, ChatGPT, Gemini). It manages the "root" instructions—context, guidelines, and memory—ensuring your AI always knows *how* to work on your codebase without hallucinating or forgetting rules.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status: Production Ready](https://img.shields.io/badge/Status-Version%201.1.0-green)]()
+[![Status: Production Ready](https://img.shields.io/badge/Status-Version%201.2.0-green)]()
 
 ## The Concept
 

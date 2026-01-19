@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-01-19
+### Added
+- **Template System**: New `aipim template` command for managing prompt templates.
+  - Access core templates: `stuck`, `review`, `summary`, `optimize`, `explain`
+  - Create custom templates: `aipim template add <name>`
+  - Edit custom templates: `aipim template <name> --edit`
+  - List available templates: `aipim template --list`
+  - Dynamic variable injection (task context, git info, session data)
+  - Output options: clipboard (default), `--print` for terminal
+- **Task Management**: Enhanced task lifecycle with `aipim task init <type> <name>`.
+  - Auto-incrementing task IDs (TASK-001, TASK-002, etc.)
+  - Structured task files with Context, Objective, and Verification sections
+  - File signature protection for integrity
+  - Automatic backlog registration
+- **Dependency Visualization**: New `aipim deps` command.
+  - Visual task dependency graphs
+  - Circular dependency detection with warnings
+  - Task grouping by status (blocked, in-progress, backlog, completed)
+- **Session Management**: New `aipim pause --reason "<reason>"` command.
+  - Captures current session state and task context
+  - Optional git stashing for uncommitted changes
+  - Creates interruption snapshots for resumption
+- **Session Starter**: Enhanced `aipim start` command.
+  - Generate comprehensive session prompts with project context
+  - Options: `--print`, `--file <path>`, `--full`, `--verbose`
+  - Clipboard integration by default
+  - Includes git status, recent commits, and task progress
+- **Core Utilities**: New utility modules for improved functionality.
+  - Template engine with dynamic variable rendering
+  - Dependency graph builder with cycle detection
+  - Path validation for security
+  - Enhanced clipboard integration
+
+### Changed
+- **Task Manager**: Full rewrite with auto-ID generation and signature-based protection.
+- **Context Parsing**: Improved utilities for parsing context and task files.
+
+### Fixed
+- Path traversal vulnerabilities with new validation layer.
+- Template rendering edge cases with better error handling.
+
 ## [1.1.3] - 2026-01-19
 ### Added
 - **Commands**: New `deps`, `pause`, and `resume` commands for improved workflow management.
