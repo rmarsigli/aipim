@@ -457,6 +457,29 @@ view app/
 
 **Status values:** Proposed | Accepted | Deprecated | Superseded
 
+## ADR Auto-Detection Protocol
+
+**MANDATORY: Check for architectural decisions after each task**
+
+### Detection Triggers
+
+If you (the Agent or User) have made any of the following changes, strictly prompt for an ADR:
+
+1.  **Technology/Library Choice:** "Chose X over Y" (e.g., `zod` vs `yup`, `postgres` vs `mongo`)
+2.  **Schema Design:** "Designed database structure for X" (e.g., relations, indexing strategy)
+3.  **API Architecture:** "Defined endpoints/patterns for X" (e.g., REST vs GraphQL, error envelope)
+4.  **Security Mechanism:** "Implemented auth/security for X" (e.g., JWT, RBAC, encryption)
+5.  **Performance Pattern:** "Optimized X using Y" (e.g., caching strategy, lazy loading)
+6.  **Refactoring Pattern:** "Refactored to use [Pattern Name]" (e.g., Factory, Strategy, Observer)
+
+### Agent Protocol
+
+If a trigger is detected, the Agent **MUST** ask:
+
+> "I noticed we made an architectural decision regarding [TOPIC]. Should we create an ADR to document the context, alternatives, and rationale?
+>
+> Run: `cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-[topic].md`"
+
 ## Automation
 
 ### Validation Script

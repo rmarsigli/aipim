@@ -18,25 +18,26 @@ Date: 2025-01-07
 
 ## Context
 
-**Problem:**
-[What technical decision needs to be made? Why now?]
+**The Problem:**
+<!-- What is the specific problem or conflict? Why do we need to make a decision now? -->
+<!-- Example: "We need a validation library that supports TS inference and custom error messages." -->
 
-**Current Situation:**
-[What's the current state? Constraints?]
-
-**Forces:**
-- Technical: [requirements]
-- Business: [budget, timeline]
-- Team: [skills, capacity]
+**Context & Constraints:**
+<!-- What constraints (technological, business, time) are we working under? -->
+- Tech Stack: [e.g., Node.js, TypeScript]
+- Timeline: [e.g., Need urgency]
+- Scalability: [e.g., Must handle 1k rps]
+- Budget/Skills: [e.g., Team knows SQL well]
 
 ## Decision
 
-**We will:** [Chosen option]
+**We will use:** [Chosen Solution]
 
 **Rationale:**
-1. Technical fit: [why technically sound]
-2. Operational: [why operationally viable]
-3. Strategic: [why aligns with goals]
+<!-- Why is this the best choice? Link back to constraints. -->
+1.  **Alignment:** [Matches tech stack/skills]
+2.  **Benefit:** [Solves the main problem]
+3.  **Future-proof:** [Supports expected growth]
 
 ## Alternatives Considered
 
