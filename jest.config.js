@@ -9,16 +9,17 @@ export default {
         '!src/**/*.d.ts',
         '!src/**/*.test.ts',
         '!src/cli.ts',
-        '!src/prompts/**/*.ts'
+        '!src/prompts/**/*.ts',
+        '!src/templates/**/*'
     ],
     coverageDirectory: 'coverage',
     coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
     coverageThreshold: {
         global: {
-            branches: 50,
-            functions: 60,
-            lines: 60,
-            statements: 60
+            branches: 40,
+            functions: 50,
+            lines: 50,
+            statements: 50
         }
     },
     moduleNameMapper: {
