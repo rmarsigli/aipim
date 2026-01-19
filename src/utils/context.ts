@@ -167,3 +167,74 @@ export function getRecentDecisions(projectDir: string, count: number): Array<{ f
     }
     return []
 }
+
+export function calculateProgress(content: string): {
+    completed: number
+    total: number
+    percentage: number
+} {
+    const checkboxes = content.match(/- \[[ xX]\]/g) || []
+    const completed = content.match(/- \[[xX]\]/g)?.length || 0
+    const total = checkboxes.length
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
+
+    return { completed, total, percentage }
+}
+
+export function extractCheckpoints(content: string): {
+    lastCompleted: string[]
+    current: string | null
+    next: string | null
+} {
+    const lines = content.split('\n')
+    const completed: string[] = []
+    let current: string | null = null
+    let next: string | null = null
+
+    let foundCurrent = false
+
+    for (const line of lines) {
+        const checkedMatch = line.match(/^- \[x\]\s*(.+)$/i)
+        if (checkedMatch && !foundCurrent) {
+            completed.push(checkedMatch[1].trim())
+        }
+
+        const uncheckedMatch = line.match(/^- \[ \]\s*(.+)$/)
+        if (uncheckedMatch && !foundCurrent) {
+            current = uncheckedMatch[1].trim()
+            foundCurrent = true
+        } else if (uncheckedMatch && foundCurrent && !next) {
+            next = uncheckedMatch[1].trim()
+            break
+        }
+    }
+
+    // Return last 3 completed items
+    const lastCompleted = completed.slice(-3)
+
+    return { lastCompleted, current, next }
+}
+
+export function extractObjective(content: string): string {
+    const lines = content.split('\n')
+    let inObjective = false
+    let objective = ''
+
+    for (const line of lines) {
+        if (line.startsWith('## Objective')) {
+            inObjective = true
+            continue
+        }
+
+        if (inObjective) {
+            if (line.startsWith('##')) {
+                break
+            }
+            if (line.trim() && !line.startsWith('**')) {
+                objective += line.trim() + ' '
+            }
+        }
+    }
+
+    return objective.trim()
+}
