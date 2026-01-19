@@ -8,7 +8,7 @@ actual_hours: 4.5
 status: done
 blockers: []
 tags: [template, automation, documentation, adr]
-related_files: [src/templates/base/project-manager.md, src/templates/base/.project/_templates/adr-template.md]
+related_files: [src/templates/base/project-manager.md, src/templates/base/.project/_templates/adr.md]
 ---
 
 # Task: Add ADR Auto-Creation Detection System

