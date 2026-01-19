@@ -11,13 +11,15 @@
 ```
 .project/
   ├── _templates/          # Templates (task, context, adr, backlog)
-  ├── current-task.md      # Active work (or current-task/ for complex)
+  ├── current-task.md      # Active work
   ├── context.md           # Session state persistence
-  ├── backlog/             # Future: YYYY-MM-DD-name.md
-  ├── completed/           # Archive: YYYY-MM-DD-name.md
-  ├── decisions/           # ADRs: YYYY-MM-DD-name.md
+  ├── backlog/             # Tasks: T{XXX}-{name}.md
+  ├── completed/           # Archive: {YYYY-MM-DD}-T{XXX}-{name}.md
+  ├── decisions/           # ADRs: {YYYY-MM-DD}-ADR{XXX}-{name}.md
+  ├── ideas/               # Ideas: I{XXX}-{name}.md
+  ├── reports/             # Reports: {YYYY-MM-DD}-R{XXX}-{name}.md
   ├── docs/                # Documentation
-  ├── scripts/             # Automation (validate-dod.sh, pre-session.sh)
+  ├── scripts/             # Automation
   └── README.md            # Project overview
 ```
 
@@ -334,13 +336,13 @@ Full checklist: `.project/docs/definition-of-done.md`
 cp .project/_templates/task.md .project/current-task.md
 
 # Start task from backlog (IMPORTANT: use mv not cp)
-mv .project/backlog/TASK-XXX.md .project/current-task.md
+mv .project/backlog/T{XXX}-{name}.md .project/current-task.md
 
 # Complete task
-mv .project/current-task.md .project/completed/$(date +%Y-%m-%d)-name.md
+mv .project/current-task.md .project/completed/$(date +%Y-%m-%d)-T{XXX}-{name}.md
 
 # Create ADR
-cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-name.md
+cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-ADR{XXX}-{name}.md
 
 # Validate quality
 .project/scripts/validate-dod.sh
@@ -498,7 +500,7 @@ If a trigger is detected, the Agent **MUST** ask:
 
 > "I noticed we made an architectural decision regarding [TOPIC]. Should we create an ADR to document the context, alternatives, and rationale?
 >
-> Run: `cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-[topic].md`"
+> Run: `cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-ADR{XXX}-[topic].md`"
 
 ## Automation
 

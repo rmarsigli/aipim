@@ -105,7 +105,7 @@ echo -e "${BLUE}========================================${NC}"
 if (( stale_tasks > 0 )); then
     echo -e "1. ${YELLOW}Archive stale tasks:${NC}"
     echo "   mkdir -p $ARCHIVE_DIR"
-    echo "   mv .project/backlog/TASK-XXX.md $ARCHIVE_DIR/"
+    echo "   mv .project/backlog/TXXX-name.md $ARCHIVE_DIR/"
 fi
 
 if (( blocked_tasks > 0 )); then
