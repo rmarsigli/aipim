@@ -177,6 +177,23 @@ test('user can do Y', function () {
 - 🔄 In progress: Y
 - 📝 Notes: Z
 
+## Progress Log
+
+### YYYY-MM-DD (Xh)
+**Accomplished:**
+- [x] Item 1
+- [ ] Item 2
+
+**Blockers:**
+- None
+
+**Notes:**
+- Quick observations
+
+**Velocity:** X items/h
+
+---
+
 ## Technical Notes
 
 **Decisions:**

@@ -25,6 +25,7 @@
 2.  **Work on it:**
     -   Update checkboxes in `current-task.md` as you go.
     -   Commit frequently.
+    -   **Multi-day task?** Log progress daily in "Progress Log" and run `.project/scripts/task-velocity.sh`.
 
 3.  **Pain-Driven Development:**
     -   Found a bug/annoyance? Add it to "Pain Points" in `current-task.md`.
