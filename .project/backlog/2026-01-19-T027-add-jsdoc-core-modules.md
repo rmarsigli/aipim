@@ -158,7 +158,7 @@ signatureManager.generate(content);
  * Generates SHA256 hash signature for file content
  *
  * Used to verify file integrity and detect manual modifications.
- * Signatures are stored in YAML frontmatter with @aipm-signature field.
+ * Signatures are stored in YAML frontmatter with @aipim-signature field.
  *
  * @param content - File content to hash (string or Buffer)
  * @param options - Optional configuration
