@@ -12,7 +12,7 @@
 
 > **Artificial Intelligence Project Instruction Manager — The root of your AI-assisted workflow.**
 
-AIPIM acts as the interface layer between your project and your AI coding assistant (Claude, ChatGPT, Gemini). It manages the "root" instructions—context, guidelines, and memory—ensuring your AI always knows *how* to work on your codebase without hallucinating or forgetting rules.
+AIPIM acts as the interface layer between your project and your AI coding assistant (Claude, ChatGPT, Gemini, Cursor). It manages the "root" instructions—context, guidelines, and memory—ensuring your AI always knows *how* to work on your codebase without hallucinating or forgetting rules.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Status: Production Ready](https://img.shields.io/badge/Status-Version%201.2.0-green)]()
@@ -71,10 +71,13 @@ aipim install
 ```
 
 #### 2. Start your AI Session
-AIPIM creates a `CLAUDE.md` (or `GEMINI.md`) file. Most modern AI tools will automatically read this if you mention it or if it's in the context.
+AIPIM creates AI-specific prompt files (`CLAUDE.md`, `GEMINI.md`, `CURSOR.md`, etc.). Most modern AI tools will automatically read these if you mention them or if they're in the context.
 
-**For a new project context:**
+**For chat-based AI (Claude, Gemini, ChatGPT):**
 > "I have initialized the `.project` folder. Please read `CLAUDE.md` and `.project/context.md` to understand the project architecture and guidelines before we start."
+
+**For Cursor IDE:**
+Cursor automatically detects and loads `.cursorrules` - no manual setup needed! Just open your project and start coding. See [Cursor Integration Guide](docs/cursor-integration.md) for details.
 
 #### 3. Manage Tasks
 Create a new task file with a unique ID and signature:
@@ -95,11 +98,48 @@ Updates are now reliable and safe. `aipim update` automatically:
 - **Preserves** your customizations (modified files are skipped).
 - **Updates** only pristine files to the latest version.
 
+### Supported AI Tools
+
+AIPIM generates tailored configuration for each AI tool:
+
+| AI Tool | File Generated | Auto-Detection | Best For |
+|---------|---------------|----------------|----------|
+| **Claude Code** | `CLAUDE.md` | Manual (paste in chat) | Terminal-based development |
+| **Google Gemini** | `GEMINI.md` | Manual (paste in chat) | Web-based chat interface |
+| **ChatGPT** | `CHATGPT.md` | Manual (paste in chat) | Web-based chat interface |
+| **Cursor IDE** | `CURSOR.md` + `.cursorrules` | **Automatic** ✨ | AI-powered code editor |
+
+**Example:**
+```bash
+# Install for Cursor with Rust guidelines
+aipim install --ai cursor --guidelines rust
+
+# Multiple AI tools
+aipim install --ai cursor --ai gemini --guidelines nextjs
+```
+
+👉 **Cursor users**: See the complete [Cursor Integration Guide](docs/cursor-integration.md)
+
 ### Framework Guidelines
-Stop pasting context manually. `aipim install` now:
-- **Detects** your technology stack (e.g. Next.js, Astro, Vue, Node.js).
-- **Injects** optimized official guidelines into your AI rules (`CLAUDE.md`, etc).
-- **Ensures** AI follows project-specific coding standards automatically.
+
+AIPIM detects your tech stack and injects production-ready guidelines:
+
+| Framework | Guideline Highlights | Focus |
+|-----------|---------------------|-------|
+| **React** | Hooks, TypeScript, no semicolons | Modern patterns |
+| **Next.js** | App Router, Server Components | Production optimization |
+| **Astro** | Islands Architecture, Content Collections | Zero JS by default |
+| **Vue 3** | Composition API, Pinia, VueUse | Reactive patterns |
+| **Node.js** | ESM, async/await, error handling | Backend best practices |
+| **Rust** | No `.unwrap()`, Result<T,E>, Tokio | Production safety |
+
+**How it works:**
+```bash
+aipim install --ai cursor --guidelines rust
+# ✓ Detects Cargo.toml
+# ✓ Injects 381 lines of Rust production guidelines
+# ✓ AI enforces: no unwrap(), proper error handling, Tokio async
+```
 
 ### Doctor (`validate`)
 Ensure your project is healthy with `aipim validate` (or `aipim check`). It checks:
