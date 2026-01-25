@@ -28,6 +28,11 @@ export class GuidelineRegistry {
             id: 'vue',
             name: 'Vue 3',
             templateRelativePath: 'guidelines/vue.md'
+        },
+        {
+            id: 'rust',
+            name: 'Rust (Production)',
+            templateRelativePath: 'guidelines/rust.md'
         }
     ]
 

@@ -49,6 +49,12 @@ export const FRAMEWORKS: FrameworkConfig[] = [
         name: 'Svelte',
         template: 'svelte',
         check: (pkg) => hasDep(pkg, 'svelte')
+    },
+    {
+        id: 'rust',
+        name: 'Rust',
+        template: 'rust',
+        check: () => hasFile('Cargo.toml') || hasFile('Cargo.lock')
     }
 ]
 
