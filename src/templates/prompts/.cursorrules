@@ -1,0 +1,113 @@
+You are an expert developer assistant working on this project using AIPIM (AI Project Instruction Manager).
+
+# CRITICAL: Always Read First
+- .project/context.md - Current session state and next_action
+- .project/current-task.md - Active task checklist
+- CURSOR.md - Full project guidelines (this is condensed version)
+
+{{SLOT:guidelines}}
+# Framework-specific guidelines will be injected here
+{{/SLOT:guidelines}}
+
+# Task Workflow (MANDATORY)
+1. READ task file completely before starting any work
+2. UPDATE checkboxes in task file as you complete each step
+3. RUN tests after each significant change
+4. COMMIT atomically with convention: type(scope): description
+5. VERIFY Definition of Done before marking complete
+
+# Quality Gates (ALL required)
+- All tests passing
+- No lint warnings
+- No debug code (console.log, debugger, etc.)
+- Code follows project naming conventions
+- Documentation updated if API changed
+- Commit message follows convention
+
+# Git Commit Format
+type(scope): description
+
+Types: feat, fix, docs, style, refactor, test, chore
+Example: feat(auth): implement JWT token validation
+
+# Multi-file Editing Guidelines
+- Maintain consistency across all files in a change
+- Update imports/exports when moving code
+- Verify type safety across boundaries
+- Run full test suite after multi-file changes
+
+# Context Management
+- Track your context usage
+- When >70% context used: WARN user explicitly
+- NEVER continue to next task when low on context
+- Complete current task OR pause for fresh session
+
+# Session Integrity
+- One task = one complete cycle (start → code → test → commit)
+- NEVER pick up mid-task without full context
+- Better to pause and resume than rush with degraded context
+
+# Code Quality Standards
+- No .unwrap() or .expect() in production Rust code
+- Always use Result<T, E> for fallible operations
+- Prefer borrowing over cloning in Rust
+- No any types in TypeScript - use unknown with type guards
+- Async/await over raw Promises
+- Meaningful variable names (no x, tmp, data)
+
+# Error Handling
+- Always handle errors explicitly
+- Provide context in error messages
+- Log errors appropriately (structured logging)
+- Never swallow errors silently
+
+# Testing Requirements
+- Unit tests for business logic
+- Integration tests for API endpoints
+- Test edge cases and error paths
+- Maintain >80% code coverage
+- Tests must be deterministic (no flaky tests)
+
+# Performance
+- Avoid N+1 queries (use eager loading)
+- Add database indexes for queried fields
+- Paginate large result sets
+- Cache expensive computations
+- Profile before optimizing
+
+# Security
+- Validate all user input
+- Sanitize data before database queries
+- Never log sensitive data (passwords, tokens)
+- Use CSRF protection for state-changing operations
+- Implement proper authentication/authorization
+
+# Documentation
+- Update README for user-facing changes
+- Create ADR (.project/decisions/) for architectural decisions
+- Document why, not what (code shows what)
+- Keep docs in sync with code
+
+# Anti-patterns to AVOID
+- Premature optimization
+- God objects/functions (keep small and focused)
+- Magic numbers (use named constants)
+- Commented-out code (delete it, git remembers)
+- Hardcoded configuration (use environment variables)
+- Ignoring linter warnings
+
+# When Stuck
+- Read related code first
+- Check existing patterns in codebase
+- Review task checklist for guidance
+- Ask user for clarification if requirements unclear
+
+# Before Completing Task
+1. All checkboxes marked
+2. Tests passing
+3. Lint clean
+4. Documentation updated
+5. Atomic commit created
+6. Task file moved to .project/completed/
+
+Remember: Quality over speed. Better to deliver working, tested code than rush broken code.

@@ -122,6 +122,11 @@ async function generatePrompt(ai: string, config: InstallConfig, templatesDir: s
         const safePath = validatePath(filename)
         await fs.writeFile(safePath, signedPrompt, 'utf-8')
     }
+
+    // For Cursor, also generate .cursorrules
+    if (ai === 'cursor') {
+        await generateCursorRules(config, templatesDir)
+    }
 }
 
 function getPromptFilename(ai: string): string {
@@ -129,10 +134,29 @@ function getPromptFilename(ai: string): string {
         'claude-code': 'CLAUDE.md',
         'claude-ai': 'CLAUDE.md',
         gemini: 'GEMINI.md',
-        chatgpt: 'CHATGPT.md'
+        chatgpt: 'CHATGPT.md',
+        cursor: 'CURSOR.md'
     }
 
     return filenames[ai] || `${ai.toUpperCase()}.md`
+}
+
+async function generateCursorRules(config: InstallConfig, templatesDir: string): Promise<void> {
+    const cursorRulesPath = path.join(templatesDir, 'prompts/.cursorrules')
+    let cursorRules = await fs.readFile(cursorRulesPath, 'utf-8')
+
+    if (config.guidelines && config.guidelines.length > 0) {
+        cursorRules = await mergeGuidelines(cursorRules, config.guidelines, templatesDir)
+    }
+
+    const signedRules = signatureManager.sign(cursorRules)
+
+    if (config.dryRun) {
+        logger.info(`[DRY RUN] Would write .cursorrules file (${signedRules.length} bytes)`)
+    } else {
+        const safePath = validatePath('.cursorrules')
+        await fs.writeFile(safePath, signedRules, 'utf-8')
+    }
 }
 
 async function makeScriptsExecutable(dryRun?: boolean): Promise<void> {
