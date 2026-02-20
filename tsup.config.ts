@@ -11,9 +11,10 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     splitting: false,
+    // better-sqlite3 is a native module — cannot be bundled
+    external: ['better-sqlite3'],
     onSuccess: async () => {
         await fs.copyFile('package.json', 'dist/package.json')
         await fs.copy('src/templates', 'dist/templates')
-        await fs.copy('src/prompts', 'dist/prompts')
     }
 })

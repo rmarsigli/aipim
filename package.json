@@ -51,6 +51,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.1.0",
+    "better-sqlite3": "^12.6.2",
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
     "fs-extra": "^11.3.3",
@@ -59,6 +60,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@jest/globals": "^30.2.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.9",
     "@types/jest": "^30.0.0",
