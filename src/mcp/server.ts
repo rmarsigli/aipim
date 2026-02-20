@@ -63,7 +63,9 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
             }
 
             try {
-                const result = await tool.handler({ db, projectRoot, events: readEvents(projectRoot) }, toolArgs)
+                const result = await Promise.resolve(
+                    tool.handler({ db, projectRoot, events: readEvents(projectRoot) }, toolArgs)
+                )
                 return c.json({
                     jsonrpc: '2.0',
                     id: body.id,

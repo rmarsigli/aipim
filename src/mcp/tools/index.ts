@@ -19,8 +19,10 @@ export interface McpToolSchema {
 
 export interface McpTool {
     schema: McpToolSchema
-    handler: (ctx: ToolContext, args: Record<string, unknown>) => Promise<unknown>
+    handler: (ctx: ToolContext, args: Record<string, unknown>) => unknown
 }
 
-// Tool registry — populated by TASK-005 (read tools) and TASK-006 (write tools)
-export const ALL_TOOLS: McpTool[] = []
+import { readTools } from './read.js'
+
+// Tool registry — write tools added by TASK-006
+export const ALL_TOOLS: McpTool[] = [...readTools]
