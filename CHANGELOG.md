@@ -5,6 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-alpha] - 2026-02-20
+
+Complete architectural rewrite. The clipboard/copy-paste session workflow is replaced by a persistent MCP server that Claude Code connects to directly.
+
+### Breaking Changes
+
+- `aipim start`, `aipim resume`, `aipim pause` removed — replaced by the MCP server.
+- Session prompts and clipboard workflow removed entirely.
+- `.project/` markdown files are no longer the source of truth — `events.jsonl` is.
+
+### Added
+
+**Event-sourced core (`src/core/events.ts`)**
+- Append-only `events.jsonl` log — 12 event types covering the full task lifecycle.
+- `appendEvent()` auto-assigns `id`, `timestamp`, `actor` (resolved from `AIPIM_USER` env, git email, or team config).
+- `readEvents()`, `readEventsForTask()`.
+- `.gitattributes` configured with `merge=union` so concurrent team pushes never conflict.
+
+**SQLite derived state (`src/core/db.ts`)**
+- `rebuild()` drops and recreates all tables from `events.jsonl` — fully idempotent.
+- `applyEvent()` for incremental updates (append → apply, never write DB directly).
+- Tables: `tasks`, `comments`, `decisions`, `events_log`.
+- Query helpers: `queryTasks()`, `getNextTask()`, `getTask()`, `getBlockers()`, `getStats()`, `getCommentsForTask()`, `getDecisions()`.
+
+**Migration from 1.x (`src/core/migrator.ts`)**
+- `migrate()` reads `backlog/*.md` and `completed/*.md`, synthesizes events into `events.jsonl`.
+- Idempotent — skips already-migrated tasks. Run once, safe to re-run.
+- `aipim migrate [--project <path>]`
+
+**MCP server (`src/mcp/server.ts`)**
+- Hono HTTP server on port 3141 (configurable).
+- Boot sequence: migrate → rebuild SQLite → serve.
+- `POST /mcp` — JSON-RPC 2.0 endpoint for Claude Code.
+- Supports: `initialize`, `notifications/initialized`, `tools/list`, `tools/call`.
+- `aipim mcp start [--port 3141] [--project <path>]`
+
+**MCP read tools (`src/mcp/tools/read.ts`)**
+- `get_project_context` — project name, stats, active blockers, recent decisions.
+- `get_next_task` — highest-priority backlog task.
+- `list_tasks` — all tasks with optional `status`/`assignee`/`priority` filter.
+- `get_task` — single task with comments.
+- `get_blockers` — all tasks with status `blocked`.
+
+**MCP write tools (`src/mcp/tools/write.ts`)**
+- `create_task` — adds task to backlog, writes `.md` file, appends event.
+- `complete_task` — marks done, moves `.md` to `completed/`, appends event.
+- `update_task_status` — changes status with optional reason comment.
+- `assign_task` — assigns to a team member from `config.toml`.
+- `add_comment` — appends immutable comment.
+- `log_decision` — writes ADR `.md` to `decisions/`, appends event.
+
+**REST API (`src/mcp/api.ts`)**
+- `GET /api/tasks` — task list with `status`, `assignee`, `priority` filters.
+- `GET /api/tasks/:id` — task + markdown content + comments.
+- `POST /api/events` — write any event directly.
+- `GET /api/events` — paginated history (`limit` max 500, `offset`).
+- `GET /api/events/stream` — SSE real-time feed with 30s keep-alive ping.
+- `GET /api/stats` — task counts by status.
+- `GET /api/team` — team members from `config.toml`.
+- `GET /api/decisions` — all ADRs.
+- CORS restricted to `localhost` / `127.0.0.1`.
+
+**Team configuration (`src/core/team.ts`)**
+- `.project/config.toml` — project name + team members (`id`, `name`, `email`, `role`, `areas`).
+- `resolveActor()` — `AIPIM_USER` env → git email matched to member id → raw email → `"unknown"`.
+- `loadConfig()`, `getMember()`, `addTeamMember()`.
+- `aipim team list` — list members.
+- `aipim team whoami` — show resolved actor.
+- `aipim team add` — interactive wizard.
+- `aipim team setup-git` — configure `.gitattributes` union merge (idempotent).
+
+**Task priority fix**
+- `aipim task next` now sorts by real priority (`P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3`), oldest first on tie — previously sorted by filename.
+- `resolveNextTask()` extracted as a pure exportable function.
+
+### Changed
+
+- `appendEvent()` now calls `resolveActor(projectRoot)` for actor resolution, replacing the local `getActor()` function. Actors are resolved against `config.toml` team members when available.
+- `aipim install` now calls `setupGitAttributes()` to configure `.gitattributes` automatically.
+- `aipim mcp start` logs both the MCP endpoint and the REST API base URL on boot.
+
+### Documentation
+
+- README rewritten for 2.0 (architecture diagram, MCP quick start, all commands, MCP tools table).
+- `docs/cli-reference.md` — updated to reflect actual commands, removed 1.x commands.
+- `docs/basic-usage.md` — MCP-first workflow.
+- `docs/quick-start.md` — rewritten for 2.0.
+- `docs/advanced-usage.md` — multiple projects, DB rebuild, REST API examples, team collaboration.
+- `docs/troubleshooting.md` — 2.0-specific issues.
+- Removed `docs/about-tokens-usage.md` and `docs/cursor-integration.md` (obsolete).
+
+---
+
 ## [1.3.0] - 2026-01-25
 ### Added
 - **Cursor IDE Support**: Full integration with CURSOR.md and .cursorrules.
