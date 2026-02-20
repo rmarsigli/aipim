@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { input, select } from '@inquirer/prompts'
 import chalk from 'chalk'
 import { loadConfig, resolveActor, getMember, addTeamMember, TeamMember } from '@/core/team.js'
+import { setupGitAttributes } from '@/core/installer.js'
 import { logger } from '@/utils/logger.js'
 import { output } from '@/utils/output.js'
 
@@ -111,5 +112,15 @@ export function registerTeamCommand(program: Command): void {
 
             addTeamMember(cwd, member)
             logger.success(`Team member ${chalk.cyan(member.id)} added to .project/config.toml`)
+        })
+
+    team.command('setup-git')
+        .description('Configure .gitattributes with union merge driver for events.jsonl')
+        .action(async () => {
+            const cwd = process.cwd()
+            await setupGitAttributes(cwd)
+            logger.success('.gitattributes configured — events.jsonl will use union merge driver')
+            logger.info('Why: two devs pushing events simultaneously will never get a merge conflict.')
+            logger.info('The union driver keeps all lines from both sides — always correct for append-only logs.')
         })
 }

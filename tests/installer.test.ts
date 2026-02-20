@@ -101,9 +101,9 @@ describe('installProject', () => {
     })
 
     test('ignores missing scripts during chmod', async () => {
-        // Mock pathExists to return false for scripts
+        // Mock pathExists to return false for scripts and .gitattributes
         jest.spyOn(fs, 'pathExists').mockImplementation(async (p) => {
-            if (typeof p === 'string' && p.includes('scripts/')) return false
+            if (typeof p === 'string' && (p.includes('scripts/') || p.endsWith('.gitattributes'))) return false
             return true
         })
 

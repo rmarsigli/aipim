@@ -8,6 +8,9 @@ import { signatureManager } from '@/core/signature.js'
 import { fileURLToPath } from 'url'
 import { validatePath } from '@/utils/path-validator.js'
 
+const GITATTRIBUTES_MARKER = 'events.jsonl merge=union'
+const GITATTRIBUTES_BLOCK = `\n# AIPIM: prevent merge conflicts in the append-only event log.\n# The union driver keeps all lines from both sides — always correct for append-only logs.\n.project/events.jsonl merge=union\n`
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -51,6 +54,9 @@ export async function installProject(config: InstallConfig, _detected: DetectedP
 
     logger.debug('Generating prompt files...')
     await Promise.all(config.ais.map((ai) => generatePrompt(ai, config, templatesDir)))
+
+    logger.debug('Configuring .gitattributes...')
+    await setupGitAttributes(process.cwd(), config.dryRun)
 
     logger.debug('Making scripts executable...')
     await makeScriptsExecutable(config.dryRun)
@@ -156,6 +162,33 @@ async function generateCursorRules(config: InstallConfig, templatesDir: string):
         const safePath = validatePath('.cursorrules')
         await fs.writeFile(safePath, signedRules, 'utf-8')
     }
+}
+
+/**
+ * Ensures `.gitattributes` contains the union merge entry for events.jsonl.
+ * Appends the block if it is not already present. Creates the file if needed.
+ * Safe to call multiple times — idempotent.
+ */
+export async function setupGitAttributes(projectRoot: string, dryRun?: boolean): Promise<void> {
+    const gitattributesPath = path.join(projectRoot, '.gitattributes')
+
+    if (dryRun) {
+        logger.info(`[DRY RUN] Would configure ${gitattributesPath} with merge=union for events.jsonl`)
+        return
+    }
+
+    if (await fs.pathExists(gitattributesPath)) {
+        const current = await fs.readFile(gitattributesPath, 'utf-8')
+        if (current.includes(GITATTRIBUTES_MARKER)) {
+            logger.debug('.gitattributes already configured')
+            return
+        }
+        await fs.appendFile(gitattributesPath, GITATTRIBUTES_BLOCK, 'utf-8')
+    } else {
+        await fs.writeFile(gitattributesPath, GITATTRIBUTES_BLOCK.trimStart(), 'utf-8')
+    }
+
+    logger.debug('.gitattributes configured with union merge driver for events.jsonl')
 }
 
 async function makeScriptsExecutable(dryRun?: boolean): Promise<void> {
