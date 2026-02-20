@@ -6,6 +6,53 @@ import chalk from 'chalk'
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
+export interface TaskSummary {
+    file: string
+    title: string
+    priority: string
+    created: string
+}
+
+const PRIORITY_ORDER: Record<string, number> = {
+    'P1-S': 1,
+    'P1-M': 2,
+    'P1-L': 3,
+    'P2-S': 4,
+    'P2-M': 5,
+    'P2-L': 6,
+    P3: 7
+}
+
+/**
+ * Selects the highest-priority task from a list of backlog .md files.
+ * Order: P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3, oldest first on tie.
+ */
+export function resolveNextTask(files: string[], backlogDir: string): TaskSummary | null {
+    if (files.length === 0) return null
+
+    const tasks: TaskSummary[] = files.map((file) => {
+        const content = readFileSync(join(backlogDir, file), 'utf-8')
+        const titleMatch = content.match(/^title:\s*"?(.+?)"?\s*$/m)
+        const priorityMatch = content.match(/^priority:\s*(.+?)\s*$/m)
+        const createdMatch = content.match(/^created:\s*(.+?)\s*$/m)
+        return {
+            file,
+            title: titleMatch?.[1] ?? file,
+            priority: priorityMatch?.[1]?.trim() ?? 'P3',
+            created: createdMatch?.[1] ?? file
+        }
+    })
+
+    tasks.sort((a, b) => {
+        const pa = PRIORITY_ORDER[a.priority] ?? 8
+        const pb = PRIORITY_ORDER[b.priority] ?? 8
+        if (pa !== pb) return pa - pb
+        return a.created.localeCompare(b.created)
+    })
+
+    return tasks[0]
+}
+
 export function registerTaskCommand(program: Command): void {
     const task = program.command('task').description('Manage project tasks')
 
@@ -58,39 +105,11 @@ function nextTask(): void {
         process.exit(0)
     }
 
-    // Priority-aware ordering: P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3
-    // Reads frontmatter to extract priority and created date for proper ordering
-    const PRIORITY_ORDER: Record<string, number> = {
-        'P1-S': 1,
-        'P1-M': 2,
-        'P1-L': 3,
-        'P2-S': 4,
-        'P2-M': 5,
-        'P2-L': 6,
-        P3: 7
+    const next = resolveNextTask(backlogFiles, backlogDir)
+    if (!next) {
+        logger.warn('No tasks in backlog. All done!')
+        process.exit(0)
     }
-
-    const tasks = backlogFiles.map((file) => {
-        const content = readFileSync(join(backlogDir, file), 'utf-8')
-        const titleMatch = content.match(/^title:\s*"?(.+?)"?\s*$/m)
-        const priorityMatch = content.match(/^priority:\s*(.+?)\s*$/m)
-        const createdMatch = content.match(/^created:\s*(.+?)\s*$/m)
-        return {
-            file,
-            title: titleMatch?.[1] ?? file,
-            priority: priorityMatch?.[1]?.trim() ?? 'P3',
-            created: createdMatch?.[1] ?? file
-        }
-    })
-
-    tasks.sort((a, b) => {
-        const pa = PRIORITY_ORDER[a.priority] ?? 8
-        const pb = PRIORITY_ORDER[b.priority] ?? 8
-        if (pa !== pb) return pa - pb
-        return a.created.localeCompare(b.created)
-    })
-
-    const next = tasks[0]
 
     log('')
     log(chalk.bold('Next task:'))
