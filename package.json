@@ -27,8 +27,10 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
   },
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
     "dev": "tsup --watch",
     "start": "node dist/cli.js",
