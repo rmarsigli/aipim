@@ -266,3 +266,40 @@ describe('create_task', () => {
         expect(tasks.length).toBe(2)
     })
 })
+
+describe('assign_task', () => {
+    const tool = makeTool('assign_task')
+
+    beforeEach(() => {
+        // Write a config.toml with one team member
+        writeFileSync(
+            join(TEST_ROOT, '.project/config.toml'),
+            `[project]\nname = "Test"\n\n[[team]]\nid = "alice"\nname = "Alice Smith"\nemail = "alice@example.com"\n`,
+            'utf8'
+        )
+    })
+
+    it('assigns a task to a known team member', () => {
+        seedTask(db, 'TASK-001')
+        const result = tool.handler(ctx, { taskId: 'TASK-001', assignee: 'alice' }) as Record<string, unknown>
+        expect(result.success).toBe(true)
+        expect(result.assignee).toBe('alice')
+        expect(result.assigneeName).toBe('Alice Smith')
+    })
+
+    it('updates assignee column in SQLite', () => {
+        seedTask(db, 'TASK-001')
+        tool.handler(ctx, { taskId: 'TASK-001', assignee: 'alice' })
+        const row = db.prepare('SELECT assignee FROM tasks WHERE id = ?').get('TASK-001') as { assignee: string }
+        expect(row.assignee).toBe('alice')
+    })
+
+    it('throws when task does not exist', () => {
+        expect(() => tool.handler(ctx, { taskId: 'TASK-999', assignee: 'alice' })).toThrow('TASK-999 not found')
+    })
+
+    it('throws when assignee is not in config.toml', () => {
+        seedTask(db, 'TASK-001')
+        expect(() => tool.handler(ctx, { taskId: 'TASK-001', assignee: 'unknown' })).toThrow('not found in config.toml')
+    })
+})

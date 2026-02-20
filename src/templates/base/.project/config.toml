@@ -1,0 +1,11 @@
+[project]
+name = "My Project"
+description = "Project description"
+
+# Add team members below (optional — works as solo dev without this)
+# [[team]]
+# id = "alice"
+# name = "Alice Smith"
+# email = "alice@example.com"
+# role = "tech-lead"
+# areas = ["backend", "architecture"]

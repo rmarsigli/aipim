@@ -104,6 +104,7 @@ import { completion } from './commands/completion.js'
 import { registerTaskCommand } from './commands/task.js'
 import { registerMigrateCommand } from './commands/migrate.js'
 import { registerMcpCommand } from './commands/mcp.js'
+import { registerTeamCommand } from './commands/team.js'
 
 program
     .command('completion')
@@ -115,6 +116,7 @@ program
 registerTaskCommand(program)
 registerMigrateCommand(program)
 registerMcpCommand(program)
+registerTeamCommand(program)
 
 if (!process.argv.slice(2).length) {
     program.outputHelp()

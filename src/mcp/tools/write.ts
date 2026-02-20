@@ -2,6 +2,7 @@ import { renameSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join, basename } from 'path'
 import { appendEvent } from '../../core/events.js'
 import { applyEvent, getTask, queryTasks } from '../../core/db.js'
+import { getMember } from '../../core/team.js'
 import type { McpTool, ToolContext } from './index.js'
 
 function nextTaskId(ctx: ToolContext): string {
@@ -258,6 +259,35 @@ export const writeTools: McpTool[] = [
             applyEvent(db, event)
 
             return { success: true, taskId, filePath }
+        }
+    },
+
+    {
+        schema: {
+            name: 'assign_task',
+            description: 'Assign a task to a team member. The assignee must be a member ID from config.toml.',
+            inputSchema: {
+                type: 'object',
+                required: ['taskId', 'assignee'],
+                properties: {
+                    taskId: { type: 'string' },
+                    assignee: { type: 'string', description: 'Member ID from config.toml (e.g. "alice")' }
+                }
+            }
+        },
+        handler: ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): unknown => {
+            const taskId = args.taskId as string
+            const assignee = args.assignee as string
+
+            if (!getTask(db, taskId)) throw new Error(`Task ${taskId} not found`)
+
+            const member = getMember(projectRoot, assignee)
+            if (!member) throw new Error(`Team member "${assignee}" not found in config.toml`)
+
+            const event = appendEvent(projectRoot, { type: 'task.assigned', taskId, assignee })
+            applyEvent(db, event)
+
+            return { success: true, taskId, assignee, assigneeName: member.name }
         }
     }
 ]

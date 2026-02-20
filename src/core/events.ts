@@ -1,21 +1,12 @@
 import { readFileSync, appendFileSync, existsSync } from 'fs'
-import { execFileSync } from 'child_process'
 import { join } from 'path'
 import { AipimEvent } from '../types/index.js'
+import { resolveActor } from './team.js'
 
 const EVENTS_FILE = '.project/events.jsonl'
 
 function generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-}
-
-function getActor(): string {
-    if (process.env.AIPIM_USER) return process.env.AIPIM_USER
-    try {
-        return execFileSync('git', ['config', 'user.email'], { encoding: 'utf8' }).trim()
-    } catch {
-        return 'unknown'
-    }
 }
 
 /**
@@ -27,7 +18,7 @@ export function appendEvent(projectRoot: string, partial: Omit<AipimEvent, 'id' 
         ...partial,
         id: generateId(),
         timestamp: new Date().toISOString(),
-        actor: getActor()
+        actor: resolveActor(projectRoot)
     } as AipimEvent
 
     const filePath = join(projectRoot, EVENTS_FILE)
