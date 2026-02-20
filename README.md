@@ -214,6 +214,21 @@ npm run build      # → ui/dist/
 npm run dev        # Vite dev server on :5173 (proxies /api to :3141)
 ```
 
+## Monorepo — why we didn't split
+
+A monorepo split into `@aipim/core`, `@aipim/mcp`, and `@aipim/ui` was evaluated at the end of the 2.0 release. The conclusion was **not now**.
+
+The full npm tarball is **107 KB** (328 KB unpacked), well under any practical size concern. There is no external demand for `@aipim/core` or `@aipim/ui` as standalone packages, and no separate contributor teams working on isolated areas. The complexity of pnpm workspaces, cross-package build ordering, and workspace-linked imports would add real maintenance cost for zero user benefit at this scale.
+
+Revisit if any of these conditions become true:
+
+- The tarball grows beyond 10 MB (e.g. from bundled assets).
+- External projects want to import `@aipim/core` without the CLI.
+- `@aipim/ui` needs to run against a non-Hono server.
+- Separate contributor teams form around distinct packages.
+
+Until then, a single package is the right call.
+
 ## License
 
 [MIT](LICENSE)
