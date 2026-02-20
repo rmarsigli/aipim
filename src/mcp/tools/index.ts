@@ -23,6 +23,6 @@ export interface McpTool {
 }
 
 import { readTools } from './read.js'
+import { writeTools } from './write.js'
 
-// Tool registry — write tools added by TASK-006
-export const ALL_TOOLS: McpTool[] = [...readTools]
+export const ALL_TOOLS: McpTool[] = [...readTools, ...writeTools]
