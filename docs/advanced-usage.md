@@ -1,50 +1,82 @@
-# Advanced Usage Guide
+# Advanced Usage
 
-Power-user workflows and utility scripts for maximum productivity.
+## Running the MCP server as a service
 
-## Helper Scripts
+Use your preferred process manager to keep the server running:
 
-### 1. Velocity Tracking (`task-velocity.sh`)
-**Purpose:** Calculate detailed progress metrics for multi-day tasks.
-**Usage:**
 ```bash
-.project/scripts/task-velocity.sh
-```
-**Prerequisite:** Ensure your `current-task.md` has a "Progress Log" section populated daily.
+# pm2
+pm2 start "aipim mcp start --port 3141 --project /path/to/project" --name aipim
 
-### 2. Pain-Driven Tasks (`pain-to-tasks.sh`)
-**Purpose:** Convert "Pain Points" listed in `current-task.md` into concrete backlog items.
-**Usage:**
+# systemd (see your distro docs for unit file placement)
+# or simply run in a tmux/screen session during development
+```
+
+## Multiple projects
+
+Each project gets its own server instance on a different port:
+
 ```bash
-.project/scripts/pain-to-tasks.sh
-```
-**Workflow:**
-1.  Add annoyances to `## Pain Points` in your current task.
-2.  Run script.
-3.  Prioritize the new tasks in `.project/backlog`.
+aipim mcp start --port 3141 --project ~/projects/api
+aipim mcp start --port 3142 --project ~/projects/frontend
 
-### 3. Code Quality Analysis (`analyze-quality.sh`)
-**Purpose:** Generate a prompt for the AI to perform a rigorous code quality review.
-**Usage:**
+claude mcp add api    http://localhost:3141/mcp
+claude mcp add frontend http://localhost:3142/mcp
+```
+
+## Custom event actors
+
+Set `AIPIM_USER` to override git email resolution. Useful in CI or scripts:
+
 ```bash
-.project/scripts/analyze-quality.sh --manual
+AIPIM_USER=ci-bot aipim migrate --project .
 ```
-**Output:** A prompt to paste into your AI chat, asking for a review based on project standards.
 
-## Design Patterns
+## Rebuilding the database
 
-### Feature-First Documentation
-**Concept:** Write the documentation *before* the code to guide the AI and save tokens.
+The SQLite database is fully derived from `events.jsonl`. If it gets corrupted or you want a clean state:
 
-**Steps:**
-1.  **Create Doc:**
-    ```bash
-    cp .project/docs/features/feature-template.md .project/docs/features/my-feature.md
-    ```
-2.  **Define Logic:** detailed rules, edge cases, and user stories.
-3.  **Implement:** Tell AI "Implement based on .project/docs/features/my-feature.md".
+```bash
+rm .project/data.db
+aipim mcp start  # rebuilds automatically on startup
+```
 
-**Benefits:**
--   Clearer requirements.
--   Less conversational back-and-forth.
--   Higher code quality.
+## Querying the REST API
+
+```bash
+# All in-progress tasks
+curl "http://localhost:3141/api/tasks?status=in-progress"
+
+# Task detail with comments
+curl "http://localhost:3141/api/tasks/TASK-007"
+
+# Live event feed (SSE)
+curl -N "http://localhost:3141/api/events/stream"
+
+# Post an event directly
+curl -X POST http://localhost:3141/api/events \
+  -H "Content-Type: application/json" \
+  -d '{"type":"task.comment_added","taskId":"TASK-001","text":"Found root cause."}'
+```
+
+## Helper scripts
+
+```bash
+.project/scripts/pre-session.sh      # token estimate before a long session
+.project/scripts/validate-dod.sh     # checks tests, lint, no debug code
+.project/scripts/task-velocity.sh    # velocity and completion estimates
+.project/scripts/backlog-health.sh   # flags stale or misconfigured tasks
+.project/scripts/analyze-quality.sh  # code quality report
+```
+
+## Restoring from events.jsonl
+
+Because the database is rebuilt from events, `events.jsonl` is the only file that matters for backup. Commit it, back it up, treat it as the source of truth.
+
+If you lose `data.db` and have `events.jsonl`, nothing is lost.
+
+## Team collaboration
+
+When two developers push events simultaneously, git's `merge=union` driver keeps all lines from both sides. `events.jsonl` will never have a merge conflict. Run `aipim team setup-git` once per repository to configure this.
+
+The order of events in the merged file may differ from insertion order across machines, but this is harmless — all queries use `ORDER BY timestamp ASC`.

@@ -1,4 +1,4 @@
-# AIPIM: Project Instruction Manager
+# AIPIM
 
 ```text
     ▄▄█▄▄      █████╗ ██╗██████╗ ██╗███╗   ███╗
@@ -10,206 +10,177 @@
      ▀█▀      ═════════════════════════════════
 ```
 
-> **Artificial Intelligence Project Instruction Manager — The root of your AI-assisted workflow.**
-
-AIPIM acts as the interface layer between your project and your AI coding assistant (Claude, ChatGPT, Gemini, Cursor). It manages the "root" instructions—context, guidelines, and memory—ensuring your AI always knows *how* to work on your codebase without hallucinating or forgetting rules.
+> **Artificial Intelligence Project Instruction Manager** — event-sourced project management with MCP server.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status: Production Ready](https://img.shields.io/badge/Status-Version%201.3.0-green)]()
+[![Version](https://img.shields.io/badge/version-2.0.0--alpha-blue)]()
 
-## The Concept
+## What it is
 
-**"Aipim"** (manioc/cassava) is a resilient, versatile root essential to many cultures. 
-In software, the **root** (`/`) is where everything begins.
+AIPIM 2.0 is a project manager built around an **append-only event log**. All state (tasks, comments, decisions, assignments) derives from `events.jsonl`. A SQLite database is rebuilt from those events at startup and used as a fast read model.
 
-**AIPIM** is the grounded structure that:
-1.  **Anchors** your AI with persistent context (Memory).
-2.  **Nurtures** your code with strict Framework Guidelines (Nutrition).
-3.  **Grows** with your project via Task Management (Lifecycle).
+An **MCP server** (Model Context Protocol) exposes tools that Claude Code calls directly — no copy-paste, no clipboard workflow. A **REST API** serves the same data for the Svelte UI.
 
-Stop pasting context manually. Let **AIPIM** manage the root.
+## Architecture
+
+```
+events.jsonl  ──rebuild──▶  SQLite (read model)
+                                  │
+                    ┌─────────────┴──────────────┐
+                    ▼                            ▼
+              MCP server                    REST API
+           (Claude Code)              (/api/* for UI)
+```
+
+All writes go through `appendEvent() → applyEvent()`. The database is never written to directly.
 
 ## Quick Start
 
-### Installation
-
 ```bash
-# Install globally (recommended)
+# Install globally
 npm install -g aipim
 
-# Or use npx
-npx aipim install
-```
-
-### Methodology: The Cognitive Architecture
-
-AIPIM isn't just a file generator. It implements an **External Memory Architecture** for LLMs to solve the problems of Context Window Limits and Catastrophic Forgetting.
-
-The structure maps directly to how a processor handles memory, but optimized for AI tokens:
-
-### 1. `.project/context.md` (Heap Memory)
-**The Single Source of Truth.**
-Stores immutable project facts: Tech Stack, Business Rules, and Design Patterns. By keeping this file in your prompt context, you prevent hallucinations and ensure the AI respects your architectural constraints (e.g., "Always use `zod` for validation").
-
-### 2. `.project/current-task.md` (Instruction Pointer)
-**The Active Focus.**
-LLMs perform significantly better when focused on a constrained scope. This file acts as the current "Stack Frame," containing only the immediate checklist. Once completed, it is moved to archive, freeing up token space for the next task.
-
-### 3. `.project/decisions/` (Immutable Log)
-**Prevention of Recursion.**
-Architecture Decision Records (ADRs). By documenting *why* you chose a path (e.g., "We use generic components because X"), you prevent the AI from confusingly suggesting refactors or alternatives that were already discarded.
-
----
-
-## Usage
-
-#### 1. Initialize your project
-Run this in your project root to generate the `.project` structure and framework guidelines:
-
-```bash
+# Initialize in your project
+cd my-project
 aipim install
+
+# Start the MCP server (default port 3141)
+aipim mcp start
+
+# Register with Claude Code
+claude mcp add aipim http://localhost:3141/mcp
 ```
 
-#### 2. Start your AI Session
-AIPIM creates AI-specific prompt files (`CLAUDE.md`, `GEMINI.md`, `CURSOR.md`, etc.). Most modern AI tools will automatically read these if you mention them or if they're in the context.
+Claude Code will now call AIPIM tools directly. No session prompts, no file pasting.
 
-**For chat-based AI (Claude, Gemini, ChatGPT):**
-> "I have initialized the `.project` folder. Please read `CLAUDE.md` and `.project/context.md` to understand the project architecture and guidelines before we start."
-
-**For Cursor IDE:**
-Cursor automatically detects and loads `.cursorrules` - no manual setup needed! Just open your project and start coding. See [Cursor Integration Guide](docs/cursor-integration.md) for details.
-
-#### 3. Manage Tasks
-Create a new task file with a unique ID and signature:
+If you are migrating from AIPIM 1.x:
 
 ```bash
-aipim task init feature "Impl User Auth"
-```
-
-**Then tell your AI:**
-> "I have created/updated the active task in `.project/current-task.md`. Please review it and generate a plan."
-
-## Features
-
-### Safe Update Strategy
-Updates are now reliable and safe. `aipim update` automatically:
-- **Scans** your project for changes.
-- **Backs up** the `.project` directory before touching anything.
-- **Preserves** your customizations (modified files are skipped).
-- **Updates** only pristine files to the latest version.
-
-### Supported AI Tools
-
-AIPIM generates tailored configuration for each AI tool:
-
-| AI Tool | File Generated | Auto-Detection | Best For |
-|---------|---------------|----------------|----------|
-| **Claude Code** | `CLAUDE.md` | Manual (paste in chat) | Terminal-based development |
-| **Google Gemini** | `GEMINI.md` | Manual (paste in chat) | Web-based chat interface |
-| **ChatGPT** | `CHATGPT.md` | Manual (paste in chat) | Web-based chat interface |
-| **Cursor IDE** | `CURSOR.md` + `.cursorrules` | **Automatic** ✨ | AI-powered code editor |
-
-**Example:**
-```bash
-# Install for Cursor with Rust guidelines
-aipim install --ai cursor --guidelines rust
-
-# Multiple AI tools
-aipim install --ai cursor --ai gemini --guidelines nextjs
-```
-
-👉 **Cursor users**: See the complete [Cursor Integration Guide](docs/cursor-integration.md)
-
-### Framework Guidelines
-
-AIPIM detects your tech stack and injects production-ready guidelines:
-
-| Framework | Guideline Highlights | Focus |
-|-----------|---------------------|-------|
-| **React** | Hooks, TypeScript, no semicolons | Modern patterns |
-| **Next.js** | App Router, Server Components | Production optimization |
-| **Astro** | Islands Architecture, Content Collections | Zero JS by default |
-| **Vue 3** | Composition API, Pinia, VueUse | Reactive patterns |
-| **Node.js** | ESM, async/await, error handling | Backend best practices |
-| **Rust** | No `.unwrap()`, Result<T,E>, Tokio | Production safety |
-
-**How it works:**
-```bash
-aipim install --ai cursor --guidelines rust
-# ✓ Detects Cargo.toml
-# ✓ Injects 381 lines of Rust production guidelines
-# ✓ AI enforces: no unwrap(), proper error handling, Tokio async
-```
-
-### Doctor (`validate`)
-Ensure your project is healthy with `aipim validate` (or `aipim check`). It checks:
-- Directory structure integrity.
-- Script permissions (smart cross-platform checks).
-- File signature verification (detects legacy or tampered files).
-
-### Task Lifecycle & Automation
-AIPIM enforces a clear lifecycle for your tasks, preventing chaos.
-
-`[ Backlog ] --> [ Current Task ] --> [ Completed / Archive ]`
-
-Use `aipim task init <type> <name>` to:
-- **Auto-number** tasks (`TASK-001`, `TASK-002`) to maintain order.
-- **Generate** a structured file with sections for Context, Objective, and Verification.
-- **Register** the task in `backlog.md` automatically.
-
-### Advanced Workflows
-
-- **Pain-Driven Development**: A protocol to capture friction during testing (`current-task.md`) and automatically convert it into prioritized backlog items using `pain-to-tasks.sh`.
-- **Feature-First Documentation**: A pattern of documenting business logic in `.project/docs/features/` before implementation, significantly reducing AI context consumption.
-
-*You focus on the code; AIPIM keeps the history organized.*
-
-## Structure
-
-The system relies on a simple file structure in your project root:
-
-```bash
-.project/
-├── current-task.md      # The one active task you are working on
-├── context.md           # Persistent session memory and state
-├── backlog/             # Future tasks
-├── completed/           # Archive of finished tasks
-├── decisions/           # Architecture Decision Records (ADRs)
-└── scripts/             # Helper scripts (e.g. pre-session checks)
+aipim migrate   # reads backlog/*.md and completed/*.md → events.jsonl + SQLite
 ```
 
 ## Commands
 
-| Script | description |
-| :--- | :--- |
-| `.project/scripts/pre-session.sh` | Estimates token usage for the current session. |
-| `.project/scripts/validate-dod.sh` | validating Definition of Done (tests, lint, etc). |
-| `.project/scripts/analyze-quality.sh` | Generates a comprehensive code quality report using AI. |
-| `.project/scripts/task-velocity.sh` | Calculates team velocity and completion estimates. |
-| `.project/scripts/pain-to-tasks.sh` | Converts "pain points" documented during testing into backlog tasks. |
+### `aipim install`
 
-## Development Scripts
+Scaffolds `.project/` in the current directory. Generates `CLAUDE.md` (or `GEMINI.md`, `CURSOR.md`) from templates. Configures `.gitattributes` for union merge on `events.jsonl`.
 
-These scripts are available in `package.json` for development usage:
+```bash
+aipim install [--ai claude-code|gemini|cursor] [--guidelines react|astro|...] [--dry-run]
+```
 
-| Command | Description |
-| :--- | :--- |
-| `pnpm build` | Compiles the project using `tsup` (dist/). |
-| `pnpm test` | Runs unit tests (`src/tests`) with Jest. |
-| `pnpm test:e2e` | Runs the comprehensive CLI test suite (Smoke Tests). |
-| `pnpm lint` | Validates code style and checks logic errors. |
-| `pnpm type-check` | Validates TypeScript types. |
-| `pnpm test:coverage` | Runs unit tests and generates a coverage report (min 80%). |
+### `aipim mcp start`
 
-## Contributing
+Runs migrate → rebuild → starts Hono server.
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+```bash
+aipim mcp start [--port 3141] [--project /path/to/project]
+```
 
-1.  Fork the repository
-2.  Create your feature branch (`git checkout -b feature/amazing`)
-3.  Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4.  Push to the branch (`git push origin feature/amazing`)
-5.  Open a Pull Request
+Endpoints:
+- `POST /mcp` — JSON-RPC 2.0 for Claude Code
+- `GET /api/tasks` — task list with optional filters (`status`, `assignee`, `priority`)
+- `GET /api/tasks/:id` — task + markdown content + comments
+- `POST /api/events` — write an event
+- `GET /api/events` — paginated event history
+- `GET /api/events/stream` — SSE real-time feed
+- `GET /api/stats` — task counts by status
+- `GET /api/team` — team members from `config.toml`
+- `GET /api/decisions` — ADRs
+
+### `aipim task`
+
+```bash
+aipim task next              # show highest-priority backlog task
+aipim task init <type> <name>  # create a new task file
+```
+
+Priority order: `P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3`, oldest first on tie.
+
+### `aipim team`
+
+```bash
+aipim team list        # list members from .project/config.toml
+aipim team whoami      # resolve current actor (AIPIM_USER → git email → member id)
+aipim team add         # interactive wizard to add a member
+aipim team setup-git   # configure .gitattributes with union merge for events.jsonl
+```
+
+### `aipim migrate`
+
+One-time migration from AIPIM 1.x. Reads `.project/backlog/*.md` and `.project/completed/*.md`, generates synthetic events, rebuilds SQLite.
+
+### `aipim update`
+
+Updates scaffolded files (templates, scripts) without overwriting customizations.
+
+### `aipim validate`
+
+Checks directory structure, script permissions, and file signatures.
+
+## MCP Tools
+
+Claude Code has access to these tools via the MCP server:
+
+| Tool | Description |
+|------|-------------|
+| `get_project_context` | Project name, stats, active blockers, recent decisions |
+| `get_next_task` | Highest-priority backlog task |
+| `list_tasks` | All tasks with optional status/assignee/priority filter |
+| `get_task` | Single task with comments and full detail |
+| `get_blockers` | All blocked tasks |
+| `create_task` | Add a task to the backlog |
+| `complete_task` | Mark done, move `.md` to `completed/` |
+| `update_task_status` | Change status (backlog → in-progress → review → blocked) |
+| `assign_task` | Assign to a team member from `config.toml` |
+| `add_comment` | Append a comment (immutable) |
+| `log_decision` | Write an ADR to `decisions/` |
+
+## Team Configuration
+
+`.project/config.toml` is optional. Without it, AIPIM works as a solo-dev setup (actor = git email).
+
+```toml
+[project]
+name = "MyApp"
+description = "..."
+
+[[team]]
+id = "alice"
+name = "Alice Smith"
+email = "alice@example.com"
+role = "tech-lead"
+areas = ["backend", "architecture"]
+```
+
+Actor resolution order: `AIPIM_USER` env → git `user.email` matched to a team member id → raw email → `"unknown"`.
+
+## .project/ Structure
+
+```
+.project/
+├── events.jsonl     # append-only event log (source of truth)
+├── data.db          # SQLite (derived, gitignored)
+├── config.toml      # project + team configuration
+├── context.md       # session state for the AI
+├── current-task.md  # active task checklist
+├── backlog/         # YYYY-MM-DD-TASK-NNN-name.md
+├── completed/       # archived tasks
+├── decisions/       # ADRs
+├── _templates/      # task, context, adr templates
+└── scripts/         # validate-dod.sh, pre-session.sh, ...
+```
+
+`events.jsonl` uses `merge=union` git driver so concurrent team pushes never conflict.
+
+## Development
+
+```bash
+npm test           # 214 tests
+npm run lint       # eslint + prettier
+npm run build      # tsup → dist/
+npm run type-check
+```
 
 ## License
 
