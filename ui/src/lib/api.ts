@@ -100,3 +100,15 @@ export function postEvent(partial: Omit<AipimEvent, 'id' | 'timestamp' | 'actor'
         body: JSON.stringify(partial),
     })
 }
+
+export function getTaskEvents(id: string): Promise<AipimEvent[]> {
+    return apiFetch<AipimEvent[]>(`/api/tasks/${id}/events`)
+}
+
+export function putTaskContent(id: string, content: string): Promise<{ ok: boolean }> {
+    return apiFetch<{ ok: boolean }>(`/api/tasks/${id}/content`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+    })
+}

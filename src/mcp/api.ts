@@ -2,11 +2,11 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
 import { EventEmitter } from 'events'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Database from 'better-sqlite3'
 import { queryTasks, getTask, getCommentsForTask, getDecisions, getStats, applyEvent } from '../core/db.js'
-import { appendEvent, readEvents } from '../core/events.js'
+import { appendEvent, readEvents, readEventsForTask } from '../core/events.js'
 import { loadConfig } from '../core/team.js'
 import { AipimEvent } from '../types/index.js'
 
@@ -37,7 +37,7 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
                 }
                 return null
             },
-            allowMethods: ['GET', 'POST', 'OPTIONS'],
+            allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
             allowHeaders: ['Content-Type']
         })
     )
@@ -133,5 +133,37 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
     // GET /api/decisions
     app.get('/api/decisions', (c) => {
         return c.json(getDecisions(db))
+    })
+
+    // GET /api/tasks/:id/events — events related to a specific task
+    app.get('/api/tasks/:id/events', (c) => {
+        const taskId = c.req.param('id')
+        const events = readEventsForTask(projectRoot, taskId)
+        return c.json(events)
+    })
+
+    // PUT /api/tasks/:id/content — overwrite the task's .md file
+    app.put('/api/tasks/:id/content', async (c) => {
+        const taskId = c.req.param('id')
+        const task = getTask(db, taskId)
+        if (!task) return c.json({ error: 'Not found' }, 404)
+        if (!task.file_path) return c.json({ error: 'Task has no associated file' }, 422)
+
+        let body: { content?: unknown }
+        try {
+            body = await c.req.json()
+        } catch {
+            return c.json({ error: 'Invalid JSON body' }, 400)
+        }
+
+        if (typeof body.content !== 'string') {
+            return c.json({ error: 'Missing required field: content (string)' }, 400)
+        }
+
+        const fullPath = join(projectRoot, task.file_path)
+        if (!existsSync(fullPath)) return c.json({ error: 'File not found on disk' }, 404)
+
+        writeFileSync(fullPath, body.content, 'utf8')
+        return c.json({ ok: true })
     })
 }
