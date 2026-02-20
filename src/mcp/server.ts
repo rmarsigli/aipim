@@ -1,10 +1,19 @@
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
+import { readFileSync, existsSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import { readEvents } from '../core/events.js'
 import { rebuild, openDb } from '../core/db.js'
 import { migrate } from '../core/migrator.js'
 import { ALL_TOOLS } from './tools/index.js'
 import { registerApiRoutes } from './api.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+// dist/mcp/server.js → ../../ui/dist
+const UI_DIST = join(__dirname, '../../ui/dist')
 
 export async function startMcpServer(projectRoot: string, port = 3141): Promise<void> {
     // 1. Migrate 1.x markdown files → events.jsonl (no-op if already migrated)
@@ -18,6 +27,19 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
     const app = new Hono()
 
     registerApiRoutes(app, db, projectRoot)
+
+    // Serve Svelte UI static files if ui/dist/ exists
+    if (existsSync(UI_DIST)) {
+        app.use(
+            '/ui/*',
+            serveStatic({
+                root: UI_DIST,
+                rewriteRequestPath: (path) => path.replace(/^\/ui/, '')
+            })
+        )
+        // SPA fallback: any unmatched /ui/* route gets index.html
+        app.get('/ui/*', (c) => c.html(readFileSync(join(UI_DIST, 'index.html'), 'utf8')))
+    }
 
     app.post('/mcp', async (c) => {
         const body = await c.req.json<{
@@ -96,6 +118,9 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
                 /* eslint-disable no-console */
                 console.log(`AIPIM MCP server running at http://localhost:${port}/mcp`)
                 console.log(`REST API available at  http://localhost:${port}/api/tasks`)
+                if (existsSync(UI_DIST)) {
+                    console.log(`UI available at        http://localhost:${port}/ui/`)
+                }
                 console.log(`Add to Claude Code: claude mcp add aipim http://localhost:${port}/mcp`)
                 /* eslint-enable no-console */
                 resolve()

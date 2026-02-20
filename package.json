@@ -22,6 +22,7 @@
   },
   "files": [
     "dist",
+    "ui/dist",
     "LICENSE",
     "README.md"
   ],
