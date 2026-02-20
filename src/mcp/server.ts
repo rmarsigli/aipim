@@ -4,6 +4,7 @@ import { readEvents } from '../core/events.js'
 import { rebuild, openDb } from '../core/db.js'
 import { migrate } from '../core/migrator.js'
 import { ALL_TOOLS } from './tools/index.js'
+import { registerApiRoutes } from './api.js'
 
 export async function startMcpServer(projectRoot: string, port = 3141): Promise<void> {
     // 1. Migrate 1.x markdown files → events.jsonl (no-op if already migrated)
@@ -15,6 +16,8 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
 
     const db = openDb(projectRoot)
     const app = new Hono()
+
+    registerApiRoutes(app, db, projectRoot)
 
     app.post('/mcp', async (c) => {
         const body = await c.req.json<{
@@ -92,6 +95,7 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
             serve({ fetch: app.fetch, port }, () => {
                 /* eslint-disable no-console */
                 console.log(`AIPIM MCP server running at http://localhost:${port}/mcp`)
+                console.log(`REST API available at  http://localhost:${port}/api/tasks`)
                 console.log(`Add to Claude Code: claude mcp add aipim http://localhost:${port}/mcp`)
                 /* eslint-enable no-console */
                 resolve()

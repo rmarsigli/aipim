@@ -1,0 +1,137 @@
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { streamSSE } from 'hono/streaming'
+import { EventEmitter } from 'events'
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
+import Database from 'better-sqlite3'
+import { queryTasks, getTask, getCommentsForTask, getDecisions, getStats, applyEvent } from '../core/db.js'
+import { appendEvent, readEvents } from '../core/events.js'
+import { loadConfig } from '../core/team.js'
+import { AipimEvent } from '../types/index.js'
+
+// Module-level emitter shared between POST /api/events and GET /api/events/stream
+export const apiEventEmitter = new EventEmitter()
+// Prevent memory-leak warnings when many SSE clients connect
+apiEventEmitter.setMaxListeners(100)
+
+function readTaskContent(projectRoot: string, filePath: string | null): string | null {
+    if (!filePath) return null
+    const full = join(projectRoot, filePath)
+    if (!existsSync(full)) return null
+    return readFileSync(full, 'utf8')
+}
+
+export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot: string): void {
+    // CORS for local UI development
+    app.use(
+        '/api/*',
+        cors({
+            origin: (origin) => {
+                if (!origin) return '*'
+                try {
+                    const { hostname } = new URL(origin)
+                    if (hostname === 'localhost' || hostname === '127.0.0.1') return origin
+                } catch {
+                    // ignore malformed origin
+                }
+                return null
+            },
+            allowMethods: ['GET', 'POST', 'OPTIONS'],
+            allowHeaders: ['Content-Type']
+        })
+    )
+
+    // GET /api/tasks
+    app.get('/api/tasks', (c) => {
+        const { status, assignee, priority } = c.req.query()
+        const tasks = queryTasks(db, {
+            status: status || undefined,
+            assignee: assignee || undefined,
+            priority: priority || undefined
+        })
+        return c.json(tasks)
+    })
+
+    // GET /api/tasks/:id
+    app.get('/api/tasks/:id', (c) => {
+        const task = getTask(db, c.req.param('id'))
+        if (!task) return c.json({ error: 'Not found' }, 404)
+        const content = readTaskContent(projectRoot, task.file_path)
+        const comments = getCommentsForTask(db, task.id)
+        return c.json({ ...task, content, comments })
+    })
+
+    // POST /api/events
+    app.post('/api/events', async (c) => {
+        let partial: Omit<AipimEvent, 'id' | 'timestamp' | 'actor'>
+        try {
+            partial = await c.req.json()
+        } catch {
+            return c.json({ error: 'Invalid JSON body' }, 400)
+        }
+
+        if (!partial || typeof partial.type !== 'string') {
+            return c.json({ error: 'Missing required field: type' }, 400)
+        }
+
+        const event = appendEvent(projectRoot, partial)
+        applyEvent(db, event)
+        apiEventEmitter.emit('event', event)
+
+        return c.json(event, 201)
+    })
+
+    // GET /api/events — paginated history
+    app.get('/api/events', (c) => {
+        const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 500)
+        const offset = parseInt(c.req.query('offset') ?? '0', 10)
+
+        const all = readEvents(projectRoot)
+        const total = all.length
+        const page = all.slice(offset, offset + limit)
+
+        return c.json({ events: page, total, limit, offset })
+    })
+
+    // GET /api/events/stream — SSE real-time feed
+    app.get('/api/events/stream', (c) => {
+        return streamSSE(c, async (stream) => {
+            const handler = (event: AipimEvent): void => {
+                void stream.writeSSE({ data: JSON.stringify(event), event: event.type })
+            }
+
+            apiEventEmitter.on('event', handler)
+
+            c.req.raw.signal.addEventListener('abort', () => {
+                apiEventEmitter.off('event', handler)
+            })
+
+            // Keep-alive ping every 30 seconds
+            while (!c.req.raw.signal.aborted) {
+                await stream.sleep(30000)
+                if (!c.req.raw.signal.aborted) {
+                    void stream.writeSSE({ data: '', event: 'ping' })
+                }
+            }
+
+            apiEventEmitter.off('event', handler)
+        })
+    })
+
+    // GET /api/stats
+    app.get('/api/stats', (c) => {
+        return c.json(getStats(db))
+    })
+
+    // GET /api/team
+    app.get('/api/team', (c) => {
+        const config = loadConfig(projectRoot)
+        return c.json(config?.team ?? [])
+    })
+
+    // GET /api/decisions
+    app.get('/api/decisions', (c) => {
+        return c.json(getDecisions(db))
+    })
+}
