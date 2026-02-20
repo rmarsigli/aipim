@@ -29,7 +29,11 @@ events.jsonl  ──rebuild──▶  SQLite (read model)
                     ┌─────────────┴──────────────┐
                     ▼                            ▼
               MCP server                    REST API
-           (Claude Code)              (/api/* for UI)
+           (Claude Code)          (/api/* + /ui/* + SSE)
+                                            │
+                                       Svelte UI
+                                  (Kanban · Timeline
+                                   Task detail · Stats)
 ```
 
 All writes go through `appendEvent() → applyEvent()`. The database is never written to directly.
@@ -49,9 +53,12 @@ aipim mcp start
 
 # Register with Claude Code
 claude mcp add aipim http://localhost:3141/mcp
+
+# Open the visual UI
+aipim ui
 ```
 
-Claude Code will now call AIPIM tools directly. No session prompts, no file pasting.
+Claude Code will now call AIPIM tools directly. No session prompts, no file pasting. Open the UI at `http://localhost:3141/ui/` for a visual Kanban board, event timeline, and task detail panel.
 
 If you are migrating from AIPIM 1.x:
 
@@ -81,12 +88,32 @@ Endpoints:
 - `POST /mcp` — JSON-RPC 2.0 for Claude Code
 - `GET /api/tasks` — task list with optional filters (`status`, `assignee`, `priority`)
 - `GET /api/tasks/:id` — task + markdown content + comments
+- `GET /api/tasks/:id/events` — events related to a specific task
+- `PUT /api/tasks/:id/content` — overwrite the task's `.md` file
 - `POST /api/events` — write an event
-- `GET /api/events` — paginated event history
+- `GET /api/events` — paginated history (`limit` max 500, `offset`)
 - `GET /api/events/stream` — SSE real-time feed
 - `GET /api/stats` — task counts by status
 - `GET /api/team` — team members from `config.toml`
 - `GET /api/decisions` — ADRs
+- `GET /ui/*` — Svelte UI (served from `ui/dist/` when built)
+
+### `aipim ui`
+
+Starts the server and opens the Svelte UI in the browser.
+
+```bash
+aipim ui [--port 3141] [--project /path] [--no-open] [--dev]
+```
+
+| View | URL | Description |
+|------|-----|-------------|
+| Dashboard | `/ui/` | Stats overview + in-progress tasks |
+| Kanban | `/ui/kanban` | Columns by status, HTML5 drag-and-drop |
+| Timeline | `/ui/timeline` | Chronological event log with filters |
+| Task detail | `/ui/task/:id` | Markdown content, editor, comments, history |
+
+In production (`aipim ui`), static files from `ui/dist/` are served by Hono at `/ui/*`. In development (`aipim ui --dev`), Vite runs on port 5173 and proxies `/api` to Hono.
 
 ### `aipim task`
 
@@ -180,6 +207,11 @@ npm test           # 214 tests
 npm run lint       # eslint + prettier
 npm run build      # tsup → dist/
 npm run type-check
+
+# UI (Svelte 5 + Vite + Tailwind v4)
+cd ui && npm install
+npm run build      # → ui/dist/
+npm run dev        # Vite dev server on :5173 (proxies /api to :3141)
 ```
 
 ## License

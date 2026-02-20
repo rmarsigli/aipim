@@ -59,13 +59,30 @@ Complete architectural rewrite. The clipboard/copy-paste session workflow is rep
 **REST API (`src/mcp/api.ts`)**
 - `GET /api/tasks` — task list with `status`, `assignee`, `priority` filters.
 - `GET /api/tasks/:id` — task + markdown content + comments.
+- `GET /api/tasks/:id/events` — events related to a specific task.
+- `PUT /api/tasks/:id/content` — overwrite the task's `.md` file (used by UI editor).
 - `POST /api/events` — write any event directly.
 - `GET /api/events` — paginated history (`limit` max 500, `offset`).
 - `GET /api/events/stream` — SSE real-time feed with 30s keep-alive ping.
 - `GET /api/stats` — task counts by status.
 - `GET /api/team` — team members from `config.toml`.
 - `GET /api/decisions` — all ADRs.
+- `GET /ui/*` — Svelte UI static files served by Hono (`serveStatic` + SPA fallback).
 - CORS restricted to `localhost` / `127.0.0.1`.
+
+**Svelte UI (`ui/`)**
+- Stack: Svelte 5 (runes), Vite 6, Tailwind CSS v4, `marked` for markdown rendering.
+- `aipim ui [--port 3141] [--no-open] [--dev]` — starts server and opens browser.
+  - Production: Hono serves `ui/dist/` at `/ui/*` with SPA fallback.
+  - Dev mode: Vite dev server on `:5173`, proxying `/api` to Hono.
+- **Dashboard** (`/ui/`) — stats cards (total, in-progress, backlog, blocked, done) + in-progress task grid.
+- **Kanban board** (`/ui/kanban`) — 5 columns (Backlog, In Progress, Review, Done, Blocked); HTML5 drag-and-drop (no library); drop emits `task.status_changed` via `POST /api/events`; optimistic update + revert on failure; blocked column shows days blocked.
+- **Event timeline** (`/ui/timeline`) — chronological event log grouped by day; filters by type, actor, and period (7/30/90 days/all); rich per-type descriptions; SSE live updates prepend new events without reload.
+- **Task detail** (`/ui/task/:id`) — markdown rendered with `marked`; inline editor (textarea + save button); `PUT /api/tasks/:id/content` + `task.content_updated` event on save; comment thread with submit (Ctrl+Enter); event history via `GET /api/tasks/:id/events`.
+- Shared components: `TaskCard` (priority-colored left border, draggable), `Column`, `StatusBadge`, `PriorityBadge`.
+- SSE client (`ui/src/lib/sse.ts`) — EventSource wrapper with 3s auto-reconnect.
+- API client (`ui/src/lib/api.ts`) — typed fetch wrappers for all REST endpoints.
+- Bundle: ~37 KB gzipped (well under 100 KB).
 
 **Team configuration (`src/core/team.ts`)**
 - `.project/config.toml` — project name + team members (`id`, `name`, `email`, `role`, `areas`).
