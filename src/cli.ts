@@ -6,8 +6,6 @@ import { InstallOptions, UpdateOptions } from '@/types/index.js'
 import { install } from './commands/install.js'
 import { update } from './commands/update.js'
 import { validate } from './commands/validate.js'
-import { start } from './commands/start.js'
-import { resume } from './commands/resume.js'
 import { version } from './version.js'
 import { logger } from '@/utils/logger.js'
 
@@ -99,60 +97,8 @@ program
         }
     })
 
-program
-    .command('start')
-    .description('Generate session prompt and copy to clipboard')
-    .option('--print', 'Print prompt to terminal instead of clipboard')
-    .option('--file <path>', 'Save prompt to file')
-    .option('--full', 'Include extended context (10 commits, all ADRs)')
-    .action(async (options: unknown) => {
-        try {
-            await start(options as { print?: boolean; file?: string; full?: boolean })
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error)
-            console.error(chalk.red(`\nError: ${message}\n`))
-            process.exit(1)
-        }
-    })
-
-program
-    .command('resume')
-    .description('Show last session summary and resume work')
-    .option('--auto', 'Skip prompt and go straight to aipim start')
-    .action(async (options: unknown) => {
-        try {
-            await resume(options as { auto?: boolean })
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error)
-            console.error(chalk.red(`\nError: ${message}\n`))
-            process.exit(1)
-        }
-    })
-
 import { deps } from './commands/deps.js'
 program.addCommand(deps)
-
-import { pause } from './commands/pause.js'
-program.addCommand(pause)
-
-import { template } from './commands/template.js'
-
-program
-    .command('template')
-    .argument('[name]', 'Name of the template (e.g., stuck, review, summary)')
-    .description('Generate prompt from template')
-    .option('--list', 'List available templates')
-    .option('--print', 'Print to terminal instead of clipboard')
-    .option('--edit', 'Edit the template (custom templates only)')
-    .action(async (name: string | undefined, options: unknown) => {
-        try {
-            await template(name, options as { list?: boolean; print?: boolean; edit?: boolean })
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error)
-            console.error(chalk.red(`\nError: ${message}\n`))
-            process.exit(1)
-        }
-    })
 
 import { completion } from './commands/completion.js'
 import { registerTaskCommand } from './commands/task.js'

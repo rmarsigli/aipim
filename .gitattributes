@@ -1,1 +1,5 @@
 * text=auto eol=lf
+
+# AIPIM: prevent merge conflicts in the append-only event log.
+# The union driver keeps all lines from both sides — always correct for append-only logs.
+.project/events.jsonl merge=union
