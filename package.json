@@ -91,6 +91,7 @@
   "pnpm": {
     "overrides": {
       "test-exclude": "^7.0.1"
-    }
+    },
+    "onlyBuiltDependencies": ["better-sqlite3"]
   }
 }
