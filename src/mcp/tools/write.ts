@@ -175,14 +175,20 @@ export const writeTools: McpTool[] = [
     {
         schema: {
             name: 'log_decision',
-            description: 'Log an architectural decision (ADR). Creates a .md file in .project/decisions/.',
+            description:
+                'Log an architectural decision (ADR). Creates a .md file in .project/decisions/. If the file already exists (e.g. hand-written ADR), pass filePath to link it without overwriting.',
             inputSchema: {
                 type: 'object',
                 required: ['title', 'rationale'],
                 properties: {
                     title: { type: 'string' },
                     rationale: { type: 'string' },
-                    taskId: { type: 'string' }
+                    taskId: { type: 'string' },
+                    filePath: {
+                        type: 'string',
+                        description:
+                            'Relative path to an existing .md file. If provided, the file is linked as-is instead of creating a new one.'
+                    }
                 }
             }
         },
@@ -190,12 +196,18 @@ export const writeTools: McpTool[] = [
             const title = args.title as string
             const rationale = args.rationale as string
             const taskId = args.taskId as string | undefined
+            const existingFilePath = args.filePath as string | undefined
 
             const decisionsDir = join(projectRoot, '.project/decisions')
             mkdirSync(decisionsDir, { recursive: true })
 
-            const filePath = `.project/decisions/${today()}-ADR-${slugify(title)}.md`
-            writeFileSync(join(projectRoot, filePath), adrMarkdown(title, rationale, taskId), 'utf8')
+            let filePath: string
+            if (existingFilePath && existsSync(join(projectRoot, existingFilePath))) {
+                filePath = existingFilePath
+            } else {
+                filePath = `.project/decisions/${today()}-ADR-${slugify(title)}.md`
+                writeFileSync(join(projectRoot, filePath), adrMarkdown(title, rationale, taskId), 'utf8')
+            }
 
             const event = appendEvent(projectRoot, {
                 type: 'decision.logged',
