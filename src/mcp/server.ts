@@ -12,8 +12,8 @@ import { registerApiRoutes } from './api.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-// dist/mcp/server.js → ../../ui/dist
-const UI_DIST = join(__dirname, '../../ui/dist')
+// bundled into dist/cli.js → ../ui/dist
+const UI_DIST = join(__dirname, '../ui/dist')
 
 export async function startMcpServer(projectRoot: string, port = 3141): Promise<void> {
     // 1. Migrate 1.x markdown files → events.jsonl (no-op if already migrated)

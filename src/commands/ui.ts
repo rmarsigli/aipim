@@ -7,8 +7,8 @@ import { existsSync } from 'fs'
 import { startMcpServer } from '../mcp/server.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-// dist/commands/ui.js → ../../ui
-const UI_DIR = join(__dirname, '../../ui')
+// bundled into dist/cli.js → ../ui
+const UI_DIR = join(__dirname, '../ui')
 
 function openBrowser(url: string): void {
     const cmd =
@@ -23,10 +23,10 @@ function openBrowser(url: string): void {
 export function registerUiCommand(program: Command): void {
     program
         .command('ui')
-        .description('Start the UI server and open in browser')
+        .description('Start the UI server')
         .option('-p, --port <port>', 'Port to listen on', '3141')
         .option('--project <path>', 'Project root', process.cwd())
-        .option('--no-open', 'Do not open browser automatically')
+        .option('--open', 'Open browser automatically')
         .option('--dev', 'Start Vite dev server with hot reload')
         .action(async (opts: { port: string; project: string; open: boolean; dev: boolean }) => {
             const port = parseInt(opts.port, 10)
