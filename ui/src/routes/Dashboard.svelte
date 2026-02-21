@@ -3,6 +3,7 @@
     import type { Task, Stats } from '../lib/api.js'
     import TaskCard from '../components/TaskCard.svelte'
     import { navigate } from '../lib/router.js'
+    import { Columns, Activity, Plug, BookOpen } from 'lucide-svelte'
 
     let stats = $state<Stats>({})
     let inProgress = $state<Task[]>([])
@@ -31,6 +32,12 @@
         { label: 'Blocked', value: stats['blocked'] ?? 0, color: 'text-red-400' },
         { label: 'Done', value: (stats['done'] ?? 0) + (stats['completed'] ?? 0), color: 'text-green-400' },
     ])
+
+    const quickLinks = [
+        { path: '/kanban', label: 'Kanban Board', description: 'Drag tasks across columns', icon: Columns },
+        { path: '/timeline', label: 'Event Timeline', description: 'Chronological event history', icon: Activity },
+        { path: '/decisions', label: 'Decisions', description: 'Architecture Decision Records', icon: BookOpen },
+    ]
 </script>
 
 <div class="space-y-8">
@@ -60,30 +67,24 @@
         </div>
     {/if}
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button
-            onclick={() => navigate('/kanban')}
-            class="bg-gray-900 border border-gray-800 hover:border-indigo-700 rounded-lg p-5 text-left transition-colors group"
-        >
-            <div class="text-2xl mb-2">⬛</div>
-            <h3 class="font-medium text-gray-100 group-hover:text-indigo-300 transition-colors">Kanban Board</h3>
-            <p class="text-xs text-gray-500 mt-1">Drag tasks across columns</p>
-        </button>
-        <button
-            onclick={() => navigate('/timeline')}
-            class="bg-gray-900 border border-gray-800 hover:border-indigo-700 rounded-lg p-5 text-left transition-colors group"
-        >
-            <div class="text-2xl mb-2">📋</div>
-            <h3 class="font-medium text-gray-100 group-hover:text-indigo-300 transition-colors">Event Timeline</h3>
-            <p class="text-xs text-gray-500 mt-1">Chronological event history</p>
-        </button>
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {#each quickLinks as link}
+            <button
+                onclick={() => navigate(link.path)}
+                class="bg-gray-900 border border-gray-800 hover:border-indigo-700 rounded-lg p-5 text-left transition-colors group"
+            >
+                <link.icon size={20} class="mb-2 text-gray-500 group-hover:text-indigo-400 transition-colors" />
+                <h3 class="font-medium text-gray-100 group-hover:text-indigo-300 transition-colors">{link.label}</h3>
+                <p class="text-xs text-gray-500 mt-1">{link.description}</p>
+            </button>
+        {/each}
         <a
             href="/api/tasks"
             target="_blank"
             rel="noopener"
             class="bg-gray-900 border border-gray-800 hover:border-indigo-700 rounded-lg p-5 text-left transition-colors group block"
         >
-            <div class="text-2xl mb-2">🔌</div>
+            <Plug size={20} class="mb-2 text-gray-500 group-hover:text-indigo-400 transition-colors" />
             <h3 class="font-medium text-gray-100 group-hover:text-indigo-300 transition-colors">REST API</h3>
             <p class="text-xs text-gray-500 mt-1">Raw JSON endpoints</p>
         </a>

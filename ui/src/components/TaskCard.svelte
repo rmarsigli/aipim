@@ -3,6 +3,7 @@
     import StatusBadge from './StatusBadge.svelte'
     import PriorityBadge from './PriorityBadge.svelte'
     import { navigate } from '../lib/router.js'
+    import { AlertCircle } from 'lucide-svelte'
 
     interface Props {
         task: Task
@@ -64,7 +65,9 @@
 
         <div class="flex items-center gap-2 shrink-0">
             {#if isBlocked}
-                <span class="text-xs text-red-400 font-medium">🔴 {daysSince(task.updated_at)}d</span>
+                <span class="flex items-center gap-1 text-xs text-red-400 font-medium">
+                    <AlertCircle size={11} />{daysSince(task.updated_at)}d
+                </span>
             {/if}
             {#if assigneeShort}
                 <span class="text-xs text-gray-500">@{assigneeShort}</span>

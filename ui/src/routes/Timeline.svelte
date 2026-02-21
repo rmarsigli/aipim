@@ -4,21 +4,24 @@
     import { createSSE } from '../lib/sse.js'
     import { navigate } from '../lib/router.js'
     import { onDestroy } from 'svelte'
+    import {
+        Plus, ArrowRight, UserRound, MessageSquare, Check, Pencil,
+        ArrowUp, Link, Unlink, BookOpen, Play, Square, Minus, Inbox
+    } from 'lucide-svelte'
 
-    // ── icons & labels ─────────────────────────────────────────────
-    const EVENT_ICONS: Record<string, string> = {
-        'task.created': '+',
-        'task.status_changed': '→',
-        'task.assigned': '◎',
-        'task.comment_added': '💬',
-        'task.completed': '✓',
-        'task.content_updated': '✎',
-        'task.priority_changed': '↑',
-        'task.dependency_added': '⤵',
-        'task.dependency_removed': '⤴',
-        'decision.logged': '📋',
-        'session.started': '▶',
-        'session.ended': '■',
+    const ICON_MAP: Record<string, typeof Minus> = {
+        'task.created':            Plus,
+        'task.status_changed':     ArrowRight,
+        'task.assigned':           UserRound,
+        'task.comment_added':      MessageSquare,
+        'task.completed':          Check,
+        'task.content_updated':    Pencil,
+        'task.priority_changed':   ArrowUp,
+        'task.dependency_added':   Link,
+        'task.dependency_removed': Unlink,
+        'decision.logged':         BookOpen,
+        'session.started':         Play,
+        'session.ended':           Square,
     }
 
     const EVENT_COLORS: Record<string, string> = {
@@ -163,6 +166,11 @@
         return ((event as Record<string, unknown>).taskId as string | undefined) ?? null
     }
 
+    function getDecisionId(event: AipimEvent): string | null {
+        if (event.type !== 'decision.logged') return null
+        return event.id
+    }
+
     function formatDayHeader(dateStr: string): string {
         const date = new Date(dateStr + 'T12:00:00')
         const today = new Date()
@@ -215,13 +223,19 @@
         </div>
     </div>
 
+    <!-- Snippet: event type icon -->
+    {#snippet eventIcon(type: string)}
+        {@const Icon = ICON_MAP[type] ?? Minus}
+        <Icon size={11} />
+    {/snippet}
+
     <!-- Snippet: shared row content -->
     {#snippet rowContent(event: AipimEvent)}
         <span class="text-xs text-gray-600 font-mono w-11 shrink-0 tabular-nums">
             {formatTime(event.timestamp)}
         </span>
-        <span class="text-xs shrink-0 w-5 text-center select-none" aria-hidden="true">
-            {EVENT_ICONS[event.type] ?? '·'}
+        <span class="shrink-0 w-5 flex items-center justify-center text-gray-500" aria-hidden="true">
+            {@render eventIcon(event.type)}
         </span>
         <span class="text-sm text-gray-300 flex-1 min-w-0 truncate">
             {eventDescription(event)}
@@ -244,7 +258,7 @@
         </div>
     {:else if filteredEvents.length === 0}
         <div class="text-center py-20 text-gray-600">
-            <p class="text-5xl mb-4">📭</p>
+            <Inbox size={40} class="mx-auto mb-4 opacity-30" />
             <p class="font-medium text-gray-500">No events yet.</p>
             <p class="text-sm mt-1">Start working on a task to see the timeline.</p>
         </div>
@@ -268,16 +282,24 @@
                         <div class="pl-9 space-y-0.5">
                             {#each dayEvents as event}
                                 {@const taskId = getTaskId(event)}
+                                {@const decisionId = getDecisionId(event)}
                                 <div class="relative">
                                     <!-- timeline dot -->
                                     <div
-                                        class="absolute -left-6 top-3 w-2 h-2 rounded-full {EVENT_COLORS[event.type] ?? 'bg-gray-600'}"
+                                        class="absolute -left-7 top-3 w-2 h-2 rounded-full {EVENT_COLORS[event.type] ?? 'bg-gray-600'}"
                                     ></div>
 
                                     {#if taskId}
                                         <button
                                             class="flex items-baseline gap-3 px-3 py-2 w-full rounded-lg hover:bg-gray-900 transition-colors text-left"
                                             onclick={() => navigate(`/task/${taskId}`)}
+                                        >
+                                            {@render rowContent(event)}
+                                        </button>
+                                    {:else if decisionId}
+                                        <button
+                                            class="flex items-baseline gap-3 px-3 py-2 w-full rounded-lg hover:bg-gray-900 transition-colors text-left"
+                                            onclick={() => navigate(`/decision/${decisionId}`)}
                                         >
                                             {@render rowContent(event)}
                                         </button>
