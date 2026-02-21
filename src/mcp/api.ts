@@ -135,6 +135,15 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
         return c.json(getDecisions(db))
     })
 
+    // GET /api/decisions/:id
+    app.get('/api/decisions/:id', (c) => {
+        const all = getDecisions(db)
+        const decision = all.find((d) => d.id === c.req.param('id'))
+        if (!decision) return c.json({ error: 'Not found' }, 404)
+        const content = readTaskContent(projectRoot, decision.file_path)
+        return c.json({ ...decision, content })
+    })
+
     // GET /api/tasks/:id/events — events related to a specific task
     app.get('/api/tasks/:id/events', (c) => {
         const taskId = c.req.param('id')
