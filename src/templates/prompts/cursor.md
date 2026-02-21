@@ -27,12 +27,11 @@
 1. Read `context.md` (session state, next_action)
 2. Read `current-task.md` (active checklist)
 3. Review last commit: `git log -1 --oneline`
-4. Continue from next_action
 
 **During:**
 - Update task checkboxes as completed
 - Commit frequently
-- Add discoveries to task or backlog
+- Add discoveries to backlog
 
 **End:**
 1. Update `current-task.md`: actual_hours, checkboxes
@@ -47,7 +46,6 @@
 - Read THIS FILE (CURSOR.md) - contains MANDATORY project guidelines
 - Read `.project/context.md` - session state and metrics
 - Read `.project/backlog/` - check which task is next (or specified)
-- Count completed tasks in `.project/completed/` to know progress
 
 **2. Quality Gates (BEFORE marking task complete):**
 - [ ] All tests passing (`npm test` or equivalent)
@@ -173,9 +171,8 @@ cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-name.md
 
 ## Version & Updates
 
-**Version:** 1.2 Compact
-**Last updated:** 2025-01-25
-**Full version:** Available as `CURSOR-full.md` for reference
+**Version:** 2.0 Compact
+**Last updated:** 2026-02-21
 
 <!-- @aipim-signature: PLACEHOLDER -->
-<!-- @aipim-version: 1.2.0 -->
+<!-- @aipim-version: 2.0.0 -->

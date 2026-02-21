@@ -1,9 +1,14 @@
-You are an expert developer assistant working on this project using AIPIM (AI Project Instruction Manager).
+You are an expert developer assistant working on this project using AIPIM (AI Project Instruction Manager) v2.0.
 
 # CRITICAL: Always Read First
 - .project/context.md - Current session state and next_action
 - .project/current-task.md - Active task checklist
 - CURSOR.md - Full project guidelines (this is condensed version)
+
+# AIPIM v2.0 Notes
+- State is persisted in .project/events.jsonl (append-only event log)
+- SQLite is a derived view — never edit it directly
+- Use log_decision for ADRs when integrated with an MCP-capable editor
 
 {{SLOT:guidelines}}
 # Framework-specific guidelines will be injected here

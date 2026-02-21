@@ -25,41 +25,43 @@
 
 ## Session Protocol
 
-**Start:**
+**Start (MANDATORY — pick one):**
+
+*With AIPIM MCP (recommended):*
+1. Call `get_project_context` MCP tool — returns current state, stats, next task
+2. Review last commit: `git log -1 --oneline`
+3. Continue from `next_action`
+
+*Without MCP (fallback):*
 1. Read `context.md` (session state, next_action)
 2. Read `current-task.md` (active checklist)
 3. Review last commit: `git log -1 --oneline`
-4. Continue from next_action
 
 **Interruption Recovery:**
-- Use `aipim pause --reason="..."` to save state optionally stashing changes.
-- Use `aipim resume` to restore context and stashed work.
+- State is persisted in `events.jsonl` — no manual pause needed.
+- Call `get_project_context` (or read `context.md`) to restore state.
 
 **During:**
 - Update task checkboxes as completed
 - Commit frequently
-- Add discoveries to task or backlog
+- Add discoveries via `create_task` MCP tool or directly to backlog
 
 **End:**
-1. Update `current-task.md`: actual_hours, checkboxes
+1. Call `complete_task` MCP tool (or move file manually to `completed/`)
 2. Update `context.md`: session++, next_action, summary
-3. Check `aipim deps` to ensure no blockers
-4. Select next task from backlog (priority + dependencies)
-5. Move to `current-task.md`
-6. Update `context.md`: session++, next_action, summary
-7. **Run Quality Check (Optional):** `.project/scripts/analyze-quality.sh --manual`
-8. **Update metrics** (see Metrics Protocol below)
-9. Commit & push
+3. Call `get_next_task` to select next task
+4. **Run Quality Check (Optional):** `.project/scripts/analyze-quality.sh --manual`
+5. **Update metrics** (see Metrics Protocol below)
+6. Commit & push
 
 ## Task Workflow Protocol (MANDATORY)
 
 **When user says "do next task" or "start task X", you MUST follow this protocol:**
 
 **1. Context Loading (REQUIRED FIRST STEP):**
-- Read THIS FILE (GEMINI.md/CLAUDE.md) - contains MANDATORY project guidelines
-- Read `.project/context.md` - session state and metrics
-- Read `.project/backlog/` - check which task is next (or specified)
-- Count completed tasks in `.project/completed/` to know progress
+- Read THIS FILE (CLAUDE.md/GEMINI.md) - contains MANDATORY project guidelines
+- Call `get_project_context` MCP tool — returns stats, current task, next task, blockers
+  — OR — read `.project/context.md` + `.project/backlog/` manually if MCP unavailable
 
 **2. Quality Gates (BEFORE marking task complete):**
 - [ ] All tests passing (`npm test` or equivalent)
@@ -379,26 +381,26 @@ Full checklist: `.project/docs/definition-of-done.md`
 ## Common Commands
 
 ```bash
-# Start new task from template (for new tasks)
+# Start AIPIM server (MCP + UI)
+aipim ui
+
+# Register MCP with Claude Code (run once per project)
+claude mcp add --transport http aipim http://localhost:3141/mcp
+
+# Migrate existing v1 project to v2 event log
+aipim migrate
+
+# Manual task file operations (fallback without MCP)
 cp .project/_templates/task.md .project/current-task.md
-
-# Start task from backlog (IMPORTANT: use mv not cp)
 mv .project/backlog/T{XXX}-{name}.md .project/current-task.md
-
-# Complete task
 mv .project/current-task.md .project/completed/$(date +%Y-%m-%d)-T{XXX}-{name}.md
 
-# Create ADR
-cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-ADR{XXX}-{name}.md
-
-# Validate quality
+# Quality & health checks
 .project/scripts/validate-dod.sh
-
-# Check session budget
 .project/scripts/pre-session.sh
 ```
 
-**⚠️ Critical:** When starting a task from backlog, use `mv` (not `cp`) to remove it from backlog. Task should only exist in one place: backlog → current-task → completed.
+**MCP tools replace most manual commands.** Use `create_task`, `complete_task`, `update_task_status`, `log_decision` via Claude Code instead of editing files directly.
 
 ## Context Management
 
@@ -545,9 +547,10 @@ If you (the Agent or User) have made any of the following changes, strictly prom
 
 If a trigger is detected, the Agent **MUST** ask:
 
-> "I noticed we made an architectural decision regarding [TOPIC]. Should we create an ADR to document the context, alternatives, and rationale?
+> "I noticed we made an architectural decision regarding [TOPIC]. Should we create an ADR?
 >
-> Run: `cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-ADR{XXX}-[topic].md`"
+> With MCP: call `log_decision` with title and rationale.
+> Manually: `cp .project/_templates/adr.md .project/decisions/$(date +%Y-%m-%d)-ADR{XXX}-[topic].md`"
 
 ## Automation
 
@@ -638,16 +641,6 @@ mv .project/backlog/*P4*.md .project/ideas/archived/
 
 ## Version & Updates
 
-**Version:** 1.2 Compact  
-**Last updated:** 2025-01-07  
-**Full version:** Available as `CLAUDE-full.md` for reference  
-
-**When to use full version:**
-- First time using system (read once)
-- Training new team members
-- Need detailed examples
-
-**When to use compact version:**
-- Daily development (this file)
-- Quick reference
-- Token optimization
+**Version:** 2.0 Compact
+**Last updated:** 2026-02-21
+**Architecture:** Event-sourced (events.jsonl + SQLite) + MCP server + Svelte UI
