@@ -5,7 +5,7 @@ completed: 2026-01-19T03:35:00-03:00
 priority: P3
 estimated_hours: 2
 actual_hours: 2
-status: completed
+status: blocked
 tags: [docs, refactor]
 related_files: [src/templates/base/.project/docs/]
 ---
