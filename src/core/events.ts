@@ -3,6 +3,9 @@ import { join } from 'path'
 import { AipimEvent } from '../types/index.js'
 import { resolveActor } from './team.js'
 
+// Loose input type — type discriminant is validated, extra fields pass through
+type PartialEvent = { type: AipimEvent['type'] } & Record<string, unknown>
+
 const EVENTS_FILE = '.project/events.jsonl'
 
 function generateId(): string {
@@ -13,7 +16,7 @@ function generateId(): string {
  * Appends an event to the project's events.jsonl file.
  * Events are immutable — never edited, never deleted.
  */
-export function appendEvent(projectRoot: string, partial: Omit<AipimEvent, 'id' | 'timestamp' | 'actor'>): AipimEvent {
+export function appendEvent(projectRoot: string, partial: PartialEvent): AipimEvent {
     const event = {
         ...partial,
         id: generateId(),
