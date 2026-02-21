@@ -13,11 +13,43 @@
     let loading = $state(true)
     let error = $state<string | null>(null)
 
-    // Edit state
+    // Content edit state
     let editing = $state(false)
     let editContent = $state('')
     let saving = $state(false)
     let saveError = $state<string | null>(null)
+
+    // Inline metadata edit state
+    let editingField = $state<'status' | 'priority' | null>(null)
+
+    const STATUSES = ['backlog', 'in-progress', 'review', 'blocked', 'done']
+    const PRIORITIES = ['P1-S', 'P1-M', 'P1-L', 'P2-S', 'P2-M', 'P2-L', 'P3']
+
+    async function changeStatus(newStatus: string): Promise<void> {
+        if (!task || newStatus === task.status) { editingField = null; return }
+        const from = task.status
+        task = { ...task, status: newStatus }
+        editingField = null
+        try {
+            const event = await postEvent({ type: 'task.status_changed', taskId: task.id, from, to: newStatus })
+            taskEvents = [event, ...taskEvents]
+        } catch {
+            task = { ...task, status: from }
+        }
+    }
+
+    async function changePriority(newPriority: string): Promise<void> {
+        if (!task || newPriority === task.priority) { editingField = null; return }
+        const from = task.priority
+        task = { ...task, priority: newPriority }
+        editingField = null
+        try {
+            const event = await postEvent({ type: 'task.priority_changed', taskId: task.id, from, to: newPriority })
+            taskEvents = [event, ...taskEvents]
+        } catch {
+            task = { ...task, priority: from }
+        }
+    }
 
     // Comment state
     let newComment = $state('')
@@ -143,8 +175,43 @@
             <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 mb-2 flex-wrap">
                     <span class="text-sm font-mono text-gray-500">{task.id}</span>
-                    <StatusBadge status={task.status} />
-                    <PriorityBadge priority={task.priority} />
+
+                    {#if editingField === 'status'}
+                        <select
+                            class="text-xs bg-gray-800 border border-indigo-600 text-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+                            value={task.status}
+                            onchange={(e) => changeStatus((e.target as HTMLSelectElement).value)}
+                            onblur={() => (editingField = null)}
+                            autofocus
+                        >
+                            {#each STATUSES as s}
+                                <option value={s}>{s}</option>
+                            {/each}
+                        </select>
+                    {:else}
+                        <button onclick={() => (editingField = 'status')} title="Click to change status">
+                            <StatusBadge status={task.status} />
+                        </button>
+                    {/if}
+
+                    {#if editingField === 'priority'}
+                        <select
+                            class="text-xs bg-gray-800 border border-indigo-600 text-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+                            value={task.priority}
+                            onchange={(e) => changePriority((e.target as HTMLSelectElement).value)}
+                            onblur={() => (editingField = null)}
+                            autofocus
+                        >
+                            {#each PRIORITIES as p}
+                                <option value={p}>{p}</option>
+                            {/each}
+                        </select>
+                    {:else}
+                        <button onclick={() => (editingField = 'priority')} title="Click to change priority">
+                            <PriorityBadge priority={task.priority} />
+                        </button>
+                    {/if}
+
                     <span class="text-xs font-mono text-gray-600">{task.task_type}</span>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-100 leading-snug">{task.title}</h1>
