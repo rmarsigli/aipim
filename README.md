@@ -52,10 +52,11 @@ aipim install
 aipim mcp start
 
 # Register with Claude Code
-claude mcp add aipim http://localhost:3141/mcp
+claude mcp add --transport http aipim http://localhost:3141/mcp
 
 # Open the visual UI
 aipim ui
+# Note: aipim ui already runs aipim mcp start, you don't need to use both
 ```
 
 Claude Code will now call AIPIM tools directly. No session prompts, no file pasting. Open the UI at `http://localhost:3141/ui/` for a visual Kanban board, event timeline, and task detail panel.
@@ -103,7 +104,7 @@ Endpoints:
 Starts the server and opens the Svelte UI in the browser.
 
 ```bash
-aipim ui [--port 3141] [--project /path] [--no-open] [--dev]
+aipim ui [--port 3141] [--project /path] [--open] [--dev]
 ```
 
 | View | URL | Description |
