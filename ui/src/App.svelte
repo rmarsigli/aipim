@@ -4,6 +4,9 @@
     import Kanban from './routes/Kanban.svelte'
     import Timeline from './routes/Timeline.svelte'
     import TaskView from './routes/Task.svelte'
+    import Decisions from './routes/Decisions.svelte'
+    import DecisionView from './routes/Decision.svelte'
+    import { LayoutDashboard, Columns, Activity, BookOpen } from 'lucide-svelte'
 
     let route = $state(getPath())
 
@@ -16,11 +19,13 @@
     })
 
     const taskId = $derived(route.startsWith('/task/') ? route.slice('/task/'.length) : null)
+    const decisionId = $derived(route.startsWith('/decision/') ? route.slice('/decision/'.length) : null)
 
     const navLinks = [
-        { path: '/', label: 'Dashboard' },
-        { path: '/kanban', label: 'Kanban' },
-        { path: '/timeline', label: 'Timeline' },
+        { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/kanban', label: 'Kanban', icon: Columns },
+        { path: '/timeline', label: 'Timeline', icon: Activity },
+        { path: '/decisions', label: 'Decisions', icon: BookOpen },
     ]
 
     function isActive(path: string): boolean {
@@ -43,10 +48,11 @@
                     {#each navLinks as link}
                         <button
                             onclick={() => navigate(link.path)}
-                            class="px-3 py-1.5 rounded text-sm transition-colors {isActive(link.path)
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors {isActive(link.path)
                                 ? 'bg-gray-800 text-gray-100'
                                 : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
                         >
+                            <link.icon size={14} />
                             {link.label}
                         </button>
                     {/each}
@@ -58,10 +64,14 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {#if taskId}
             <TaskView id={taskId} />
+        {:else if decisionId}
+            <DecisionView id={decisionId} />
         {:else if route === '/kanban'}
             <Kanban />
         {:else if route === '/timeline'}
             <Timeline />
+        {:else if route === '/decisions'}
+            <Decisions />
         {:else}
             <Dashboard />
         {/if}

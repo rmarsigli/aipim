@@ -85,6 +85,10 @@ export function getDecisions(): Promise<Decision[]> {
     return apiFetch<Decision[]>('/api/decisions')
 }
 
+export function getDecision(id: string): Promise<Decision & { content: string | null }> {
+    return apiFetch<Decision & { content: string | null }>(`/api/decisions/${id}`)
+}
+
 export function getEvents(opts?: { limit?: number; offset?: number }): Promise<EventsPage> {
     const params = new URLSearchParams()
     if (opts?.limit) params.set('limit', String(opts.limit))
