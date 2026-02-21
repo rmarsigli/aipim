@@ -40,8 +40,13 @@
             })
     })
 
+    // Strip YAML frontmatter before rendering
+    function stripFrontmatter(content: string): string {
+        return content.replace(/^---[\s\S]*?---\n?/, '')
+    }
+
     // Content is from trusted local .md files — XSS risk is acceptable here
-    const renderedContent = $derived(task?.content ? marked.parse(task.content) : '')
+    const renderedContent = $derived(task?.content ? marked.parse(stripFrontmatter(task.content)) : '')
 
     function startEdit(): void {
         editContent = task?.content ?? ''
