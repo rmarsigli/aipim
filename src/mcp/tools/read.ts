@@ -25,7 +25,7 @@ function readContextMd(projectRoot: string): { session?: number; nextAction?: st
     }
 }
 
-function readFileSafe(projectRoot: string, filePath: string | null): string | null {
+export function readFileSafe(projectRoot: string, filePath: string | null): string | null {
     if (!filePath) return null
     const full = join(projectRoot, filePath)
     return existsSync(full) ? readFileSync(full, 'utf8') : null

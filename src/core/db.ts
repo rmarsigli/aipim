@@ -1,6 +1,15 @@
 import Database from 'better-sqlite3'
 import { join } from 'path'
-import { AipimEvent } from '../types/index.js'
+import {
+    AipimEvent,
+    TaskCreatedEvent,
+    TaskStatusChangedEvent,
+    TaskAssignedEvent,
+    TaskPriorityChangedEvent,
+    TaskCommentAddedEvent,
+    TaskCompletedEvent,
+    DecisionLoggedEvent
+} from '../types/index.js'
 
 const DB_FILE = '.project/data.db'
 
@@ -59,6 +68,10 @@ CREATE TABLE IF NOT EXISTS events_log (
     actor       TEXT NOT NULL,
     created_at  TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
 `
 
 export function openDb(projectRoot: string): Database.Database {
@@ -87,6 +100,66 @@ export function rebuild(projectRoot: string, events: AipimEvent[]): void {
     db.close()
 }
 
+// ─── Event handlers ──────────────────────────────────────────────────────────
+// Each handler is a pure function that receives the DB and a narrowed event.
+// To support a new event type: add a handler function and register it below.
+
+function handleTaskCreated(db: Database.Database, event: TaskCreatedEvent): void {
+    db.prepare(
+        `INSERT OR IGNORE INTO tasks (id, title, task_type, status, priority, file_path, created_at, updated_at)
+         VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?)`
+    ).run(event.taskId, event.title, event.taskType, event.priority, event.filePath, event.timestamp, event.timestamp)
+}
+
+function handleTaskStatusChanged(db: Database.Database, event: TaskStatusChangedEvent): void {
+    db.prepare(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?`).run(event.to, event.timestamp, event.taskId)
+}
+
+function handleTaskAssigned(db: Database.Database, event: TaskAssignedEvent): void {
+    db.prepare(`UPDATE tasks SET assignee = ?, updated_at = ? WHERE id = ?`).run(
+        event.assignee,
+        event.timestamp,
+        event.taskId
+    )
+}
+
+function handleTaskPriorityChanged(db: Database.Database, event: TaskPriorityChangedEvent): void {
+    db.prepare(`UPDATE tasks SET priority = ?, updated_at = ? WHERE id = ?`).run(
+        event.to,
+        event.timestamp,
+        event.taskId
+    )
+}
+
+function handleTaskCommentAdded(db: Database.Database, event: TaskCommentAddedEvent): void {
+    db.prepare(`INSERT INTO comments (id, task_id, actor, text, created_at) VALUES (?, ?, ?, ?, ?)`).run(
+        event.id,
+        event.taskId,
+        event.actor,
+        event.text,
+        event.timestamp
+    )
+}
+
+function handleTaskCompleted(db: Database.Database, event: TaskCompletedEvent): void {
+    db.prepare(`UPDATE tasks SET status = 'done', updated_at = ? WHERE id = ?`).run(event.timestamp, event.taskId)
+}
+
+function handleDecisionLogged(db: Database.Database, event: DecisionLoggedEvent): void {
+    db.prepare(
+        `INSERT INTO decisions (id, title, rationale, task_id, file_path, actor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+        event.id,
+        event.title,
+        event.rationale,
+        event.taskId ?? null,
+        event.filePath ?? null,
+        event.actor,
+        event.timestamp
+    )
+}
+
 /**
  * Applies a single event to an already-open database.
  * Used both during rebuild and for incremental updates (append → applyEvent).
@@ -100,76 +173,19 @@ export function applyEvent(db: Database.Database, event: AipimEvent): void {
 
     switch (event.type) {
         case 'task.created':
-            db.prepare(
-                `INSERT OR IGNORE INTO tasks (id, title, task_type, status, priority, file_path, created_at, updated_at)
-                 VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?)`
-            ).run(
-                event.taskId,
-                event.title,
-                event.taskType,
-                event.priority,
-                event.filePath,
-                event.timestamp,
-                event.timestamp
-            )
-            break
-
+            return handleTaskCreated(db, event)
         case 'task.status_changed':
-            db.prepare(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?`).run(
-                event.to,
-                event.timestamp,
-                event.taskId
-            )
-            break
-
+            return handleTaskStatusChanged(db, event)
         case 'task.assigned':
-            db.prepare(`UPDATE tasks SET assignee = ?, updated_at = ? WHERE id = ?`).run(
-                event.assignee,
-                event.timestamp,
-                event.taskId
-            )
-            break
-
+            return handleTaskAssigned(db, event)
         case 'task.priority_changed':
-            db.prepare(`UPDATE tasks SET priority = ?, updated_at = ? WHERE id = ?`).run(
-                event.to,
-                event.timestamp,
-                event.taskId
-            )
-            break
-
+            return handleTaskPriorityChanged(db, event)
         case 'task.comment_added':
-            db.prepare(`INSERT INTO comments (id, task_id, actor, text, created_at) VALUES (?, ?, ?, ?, ?)`).run(
-                event.id,
-                event.taskId,
-                event.actor,
-                event.text,
-                event.timestamp
-            )
-            break
-
+            return handleTaskCommentAdded(db, event)
         case 'task.completed':
-            db.prepare(`UPDATE tasks SET status = 'done', updated_at = ? WHERE id = ?`).run(
-                event.timestamp,
-                event.taskId
-            )
-            break
-
+            return handleTaskCompleted(db, event)
         case 'decision.logged':
-            db.prepare(
-                `INSERT INTO decisions (id, title, rationale, task_id, file_path, actor, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`
-            ).run(
-                event.id,
-                event.title,
-                event.rationale,
-                event.taskId ?? null,
-                event.filePath ?? null,
-                event.actor,
-                event.timestamp
-            )
-            break
-
+            return handleDecisionLogged(db, event)
         // Events that don't mutate derived state (content_updated, dependency_*, session_*)
         default:
             break

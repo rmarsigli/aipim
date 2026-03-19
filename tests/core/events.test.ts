@@ -15,8 +15,8 @@ afterEach(() => {
 })
 
 describe('appendEvent', () => {
-    it('creates events.jsonl on first write', () => {
-        appendEvent(TEST_ROOT, {
+    it('creates events.jsonl on first write', async () => {
+        await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-001',
             title: 'Test Task',
@@ -28,8 +28,8 @@ describe('appendEvent', () => {
         expect(existsSync(EVENTS_FILE)).toBe(true)
     })
 
-    it('assigns id, timestamp and actor to each event', () => {
-        const event = appendEvent(TEST_ROOT, {
+    it('assigns id, timestamp and actor to each event', async () => {
+        const event = await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-001',
             title: 'Test Task',
@@ -43,8 +43,8 @@ describe('appendEvent', () => {
         expect(event.actor).toBeTruthy()
     })
 
-    it('appends multiple events without overwriting', () => {
-        appendEvent(TEST_ROOT, {
+    it('appends multiple events without overwriting', async () => {
+        await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-001',
             title: 'First',
@@ -52,7 +52,7 @@ describe('appendEvent', () => {
             priority: 'P1-S',
             filePath: '.project/backlog/first.md',
         })
-        appendEvent(TEST_ROOT, {
+        await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-002',
             title: 'Second',
@@ -65,8 +65,8 @@ describe('appendEvent', () => {
         expect(lines).toHaveLength(2)
     })
 
-    it('each line is valid JSON', () => {
-        appendEvent(TEST_ROOT, {
+    it('each line is valid JSON', async () => {
+        await appendEvent(TEST_ROOT, {
             type: 'task.status_changed',
             taskId: 'TASK-001',
             from: 'backlog',
@@ -77,12 +77,12 @@ describe('appendEvent', () => {
         expect(() => JSON.parse(lines[0])).not.toThrow()
     })
 
-    it('uses AIPIM_USER env var as actor when set', () => {
+    it('uses AIPIM_USER env var as actor when set', async () => {
         const originalUser = process.env.AIPIM_USER
         process.env.AIPIM_USER = 'test-user@example.com'
 
         try {
-            const event = appendEvent(TEST_ROOT, {
+            const event = await appendEvent(TEST_ROOT, {
                 type: 'task.completed',
                 taskId: 'TASK-001',
             })
@@ -95,6 +95,27 @@ describe('appendEvent', () => {
             }
         }
     })
+
+    it('serialises concurrent writes (no interleaving)', async () => {
+        // Fire 10 appends concurrently — each should land as a complete JSON line
+        await Promise.all(
+            Array.from({ length: 10 }, (_, i) =>
+                appendEvent(TEST_ROOT, {
+                    type: 'task.created',
+                    taskId: `TASK-${String(i).padStart(3, '0')}`,
+                    title: `Task ${i}`,
+                    taskType: 'feat',
+                    priority: 'P1-S',
+                    filePath: `.project/backlog/task${i}.md`,
+                })
+            )
+        )
+
+        const lines = readFileSync(EVENTS_FILE, 'utf8').trim().split('\n')
+        expect(lines).toHaveLength(10)
+        // Every line must be parseable JSON
+        lines.forEach((line) => expect(() => JSON.parse(line)).not.toThrow())
+    })
 })
 
 describe('readEvents', () => {
@@ -103,9 +124,9 @@ describe('readEvents', () => {
         expect(events).toEqual([])
     })
 
-    it('returns all events in chronological order', () => {
+    it('returns all events in chronological order', async () => {
         // Write events with different timestamps manually to test ordering
-        appendEvent(TEST_ROOT, {
+        await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-001',
             title: 'First',
@@ -113,7 +134,7 @@ describe('readEvents', () => {
             priority: 'P1-S',
             filePath: '.project/backlog/first.md',
         })
-        appendEvent(TEST_ROOT, {
+        await appendEvent(TEST_ROOT, {
             type: 'task.status_changed',
             taskId: 'TASK-001',
             from: 'backlog',
@@ -144,8 +165,8 @@ describe('readEvents', () => {
 })
 
 describe('readEventsForTask', () => {
-    it('returns only events for the specified task', () => {
-        appendEvent(TEST_ROOT, {
+    it('returns only events for the specified task', async () => {
+        await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-001',
             title: 'Task One',
@@ -153,7 +174,7 @@ describe('readEventsForTask', () => {
             priority: 'P1-S',
             filePath: '.project/backlog/task1.md',
         })
-        appendEvent(TEST_ROOT, {
+        await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-002',
             title: 'Task Two',
@@ -161,7 +182,7 @@ describe('readEventsForTask', () => {
             priority: 'P2-M',
             filePath: '.project/backlog/task2.md',
         })
-        appendEvent(TEST_ROOT, {
+        await appendEvent(TEST_ROOT, {
             type: 'task.status_changed',
             taskId: 'TASK-001',
             from: 'backlog',
@@ -173,8 +194,8 @@ describe('readEventsForTask', () => {
         expect(task1Events.every((e) => 'taskId' in e && e.taskId === 'TASK-001')).toBe(true)
     })
 
-    it('returns empty array when task has no events', () => {
-        appendEvent(TEST_ROOT, {
+    it('returns empty array when task has no events', async () => {
+        await appendEvent(TEST_ROOT, {
             type: 'task.created',
             taskId: 'TASK-001',
             title: 'Task One',

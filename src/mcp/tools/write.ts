@@ -3,7 +3,7 @@ import { join, basename } from 'path'
 import { appendEvent } from '../../core/events.js'
 import { applyEvent, getTask, queryTasks } from '../../core/db.js'
 import { getMember } from '../../core/team.js'
-import { validatePath } from '../../utils/path-validator.js'
+import { validatePathSafe } from '../../utils/path-validator.js'
 import type { McpTool, ToolContext } from './index.js'
 
 function nextTaskId(ctx: ToolContext): string {
@@ -77,7 +77,7 @@ export const writeTools: McpTool[] = [
                 }
             }
         },
-        handler: ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): unknown => {
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
             const taskId = args.taskId as string
             const notes = args.notes as string | undefined
             const actualHours = args.actualHours as number | undefined
@@ -101,7 +101,7 @@ export const writeTools: McpTool[] = [
                 }
             }
 
-            const event = appendEvent(projectRoot, { type: 'task.completed', taskId, notes, actualHours })
+            const event = await appendEvent(projectRoot, { type: 'task.completed', taskId, notes, actualHours })
             applyEvent(db, event)
 
             return { success: true, taskId, completedAt: event.timestamp, fileMoved }
@@ -122,7 +122,7 @@ export const writeTools: McpTool[] = [
                 }
             }
         },
-        handler: ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): unknown => {
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
             const taskId = args.taskId as string
             const status = args.status as string
             const reason = args.reason as string | undefined
@@ -130,7 +130,7 @@ export const writeTools: McpTool[] = [
             const task = getTask(db, taskId)
             if (!task) throw new Error(`Task ${taskId} not found`)
 
-            const statusEvent = appendEvent(projectRoot, {
+            const statusEvent = await appendEvent(projectRoot, {
                 type: 'task.status_changed',
                 taskId,
                 from: task.status,
@@ -139,7 +139,7 @@ export const writeTools: McpTool[] = [
             applyEvent(db, statusEvent)
 
             if (reason) {
-                const commentEvent = appendEvent(projectRoot, {
+                const commentEvent = await appendEvent(projectRoot, {
                     type: 'task.comment_added',
                     taskId,
                     text: `Status changed to ${status}: ${reason}`
@@ -164,13 +164,13 @@ export const writeTools: McpTool[] = [
                 }
             }
         },
-        handler: ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): unknown => {
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
             const taskId = args.taskId as string
             const text = args.text as string
 
             if (!getTask(db, taskId)) throw new Error(`Task ${taskId} not found`)
 
-            const event = appendEvent(projectRoot, { type: 'task.comment_added', taskId, text })
+            const event = await appendEvent(projectRoot, { type: 'task.comment_added', taskId, text })
             applyEvent(db, event)
 
             return { success: true, commentId: event.id, taskId, text, timestamp: event.timestamp }
@@ -197,7 +197,7 @@ export const writeTools: McpTool[] = [
                 }
             }
         },
-        handler: ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): unknown => {
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
             const title = args.title as string
             const rationale = args.rationale as string
             const taskId = args.taskId as string | undefined
@@ -208,8 +208,9 @@ export const writeTools: McpTool[] = [
 
             let filePath: string
             if (existingFilePath) {
-                // Validate the caller-supplied path before trusting it
-                validatePath(existingFilePath, projectRoot)
+                // validatePathSafe resolves symlinks, preventing TOCTOU attacks
+                // where a symlink is substituted between the path check and file use.
+                await validatePathSafe(existingFilePath, projectRoot)
             }
             if (existingFilePath && existsSync(join(projectRoot, existingFilePath))) {
                 filePath = existingFilePath
@@ -218,7 +219,7 @@ export const writeTools: McpTool[] = [
                 writeFileSync(join(projectRoot, filePath), adrMarkdown(title, rationale, taskId), 'utf8')
             }
 
-            const event = appendEvent(projectRoot, {
+            const event = await appendEvent(projectRoot, {
                 type: 'decision.logged',
                 title,
                 rationale,
@@ -252,7 +253,7 @@ export const writeTools: McpTool[] = [
                 }
             }
         },
-        handler: (ctx: ToolContext, args: Record<string, unknown>): unknown => {
+        handler: async (ctx: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
             const { db, projectRoot } = ctx
             const title = args.title as string
             const taskType = args.taskType as string
@@ -269,7 +270,7 @@ export const writeTools: McpTool[] = [
                 'utf8'
             )
 
-            const event = appendEvent(projectRoot, {
+            const event = await appendEvent(projectRoot, {
                 type: 'task.created',
                 taskId,
                 title,
@@ -296,7 +297,7 @@ export const writeTools: McpTool[] = [
                 }
             }
         },
-        handler: ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): unknown => {
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
             const taskId = args.taskId as string
             const assignee = args.assignee as string
 
@@ -305,7 +306,7 @@ export const writeTools: McpTool[] = [
             const member = getMember(projectRoot, assignee)
             if (!member) throw new Error(`Team member "${assignee}" not found in config.toml`)
 
-            const event = appendEvent(projectRoot, { type: 'task.assigned', taskId, assignee })
+            const event = await appendEvent(projectRoot, { type: 'task.assigned', taskId, assignee })
             applyEvent(db, event)
 
             return { success: true, taskId, assignee, assigneeName: member.name }

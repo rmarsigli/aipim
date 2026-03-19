@@ -55,6 +55,9 @@ export interface UpdateOptions {
 
 // ─── Events (v2.0) ─────────────────────────────────────────────────────────
 
+export const TASK_STATUSES = ['backlog', 'in-progress', 'review', 'blocked', 'done'] as const
+export type TaskStatus = (typeof TASK_STATUSES)[number]
+
 export type EventType =
     | 'task.created'
     | 'task.status_changed'
@@ -68,6 +71,21 @@ export type EventType =
     | 'decision.logged'
     | 'session.started'
     | 'session.ended'
+
+export const EVENT_TYPES: EventType[] = [
+    'task.created',
+    'task.status_changed',
+    'task.assigned',
+    'task.content_updated',
+    'task.comment_added',
+    'task.priority_changed',
+    'task.dependency_added',
+    'task.dependency_removed',
+    'task.completed',
+    'decision.logged',
+    'session.started',
+    'session.ended'
+]
 
 export interface BaseEvent {
     id: string

@@ -15,6 +15,18 @@ import { version } from '../version.js'
 // MCP specification version — update only when the protocol itself changes
 const MCP_PROTOCOL_VERSION = '2024-11-05'
 
+// Maximum time a tool handler may run before the request is rejected
+const TOOL_TIMEOUT_MS = 30_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, toolName: string): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Tool "${toolName}" timed out after ${ms}ms`)), ms)
+        )
+    ])
+}
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 // bundled into dist/cli.js → ../ui/dist
@@ -22,7 +34,7 @@ const UI_DIST = join(__dirname, '../ui/dist')
 
 export async function startMcpServer(projectRoot: string, port = 3141): Promise<void> {
     // 1. Migrate 1.x markdown files → events.jsonl (no-op if already migrated)
-    migrate(projectRoot)
+    await migrate(projectRoot)
 
     // 2. Rebuild SQLite from events
     const events = readEvents(projectRoot)
@@ -99,8 +111,10 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
             }
 
             try {
-                const result = await Promise.resolve(
-                    tool.handler({ db, projectRoot, events: readEvents(projectRoot) }, toolArgs)
+                const result = await withTimeout(
+                    Promise.resolve(tool.handler({ db, projectRoot, events: readEvents(projectRoot) }, toolArgs)),
+                    TOOL_TIMEOUT_MS,
+                    toolName ?? 'unknown'
                 )
                 return c.json({
                     jsonrpc: '2.0',

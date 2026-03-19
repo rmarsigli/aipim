@@ -47,7 +47,7 @@ describe('migrate', () => {
     it('generates events from backlog tasks', async () => {
         writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-003-feat-auth.md'), BACKLOG_TASK)
 
-        const result = migrate(TEST_ROOT)
+        const result = await migrate(TEST_ROOT)
 
         expect(result.tasksFound).toBe(1)
         expect(result.eventsGenerated).toBeGreaterThanOrEqual(1) // at least task.created
@@ -57,7 +57,7 @@ describe('migrate', () => {
     it('generates task.created event with correct fields', async () => {
         writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-003-feat-auth.md'), BACKLOG_TASK)
 
-        migrate(TEST_ROOT)
+        await migrate(TEST_ROOT)
         const events = readEvents(TEST_ROOT)
 
         const created = events.find((e) => e.type === 'task.created')
@@ -72,7 +72,7 @@ describe('migrate', () => {
     it('generates task.assigned event when assignee is set', async () => {
         writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-003-feat-auth.md'), BACKLOG_TASK)
 
-        migrate(TEST_ROOT)
+        await migrate(TEST_ROOT)
         const events = readEvents(TEST_ROOT)
 
         const assigned = events.find((e) => e.type === 'task.assigned')
@@ -85,7 +85,7 @@ describe('migrate', () => {
     it('generates task.created + task.completed for completed tasks', async () => {
         writeFileSync(join(TEST_ROOT, '.project/completed/2026-01-05-TASK-001-chore-ci.md'), COMPLETED_TASK)
 
-        migrate(TEST_ROOT)
+        await migrate(TEST_ROOT)
         const events = readEvents(TEST_ROOT)
 
         expect(events.find((e) => e.type === 'task.created')).toBeDefined()
@@ -95,7 +95,7 @@ describe('migrate', () => {
     it('rebuilds SQLite — completed task shows as done', async () => {
         writeFileSync(join(TEST_ROOT, '.project/completed/2026-01-05-TASK-001-chore-ci.md'), COMPLETED_TASK)
 
-        migrate(TEST_ROOT)
+        await migrate(TEST_ROOT)
         const db = openDb(TEST_ROOT)
 
         const task = getTask(db, 'TASK-001')
@@ -106,7 +106,7 @@ describe('migrate', () => {
     it('backlog tasks appear in SQLite with correct priority', async () => {
         writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-003-feat-auth.md'), BACKLOG_TASK)
 
-        migrate(TEST_ROOT)
+        await migrate(TEST_ROOT)
         const db = openDb(TEST_ROOT)
 
         const tasks = queryTasks(db, { status: 'backlog' })
@@ -118,10 +118,10 @@ describe('migrate', () => {
     it('is idempotent — second run skips if events exist', async () => {
         writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-003-feat-auth.md'), BACKLOG_TASK)
 
-        migrate(TEST_ROOT)
+        await migrate(TEST_ROOT)
         const first = readEvents(TEST_ROOT).length
 
-        const result2 = migrate(TEST_ROOT)
+        const result2 = await migrate(TEST_ROOT)
         const second = readEvents(TEST_ROOT).length
 
         expect(result2.skipped).toBe(first)
@@ -129,7 +129,7 @@ describe('migrate', () => {
     })
 
     it('handles empty backlog and completed directories', async () => {
-        const result = migrate(TEST_ROOT)
+        const result = await migrate(TEST_ROOT)
         expect(result.tasksFound).toBe(0)
         expect(result.eventsGenerated).toBe(0)
     })
@@ -137,7 +137,7 @@ describe('migrate', () => {
     it('skips files without recognizable task IDs', async () => {
         writeFileSync(join(TEST_ROOT, '.project/backlog/README.md'), '# Not a task')
 
-        const result = migrate(TEST_ROOT)
+        const result = await migrate(TEST_ROOT)
         expect(result.tasksFound).toBe(0)
     })
 })

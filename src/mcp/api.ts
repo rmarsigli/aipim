@@ -2,26 +2,22 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
 import { EventEmitter } from 'events'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { writeFileSync } from 'fs'
+import { existsSync } from 'fs'
 import Database from 'better-sqlite3'
 import { queryTasks, getTask, getCommentsForTask, getDecisions, getStats, applyEvent } from '../core/db.js'
 import { appendEvent, readEvents, readEventsForTask } from '../core/events.js'
 import { loadConfig } from '../core/team.js'
 import { validatePath, SecurityError } from '../utils/path-validator.js'
-import { AipimEvent } from '../types/index.js'
+import { AipimEvent, EVENT_TYPES } from '../types/index.js'
+import { readFileSafe } from './tools/read.js'
 
 // Module-level emitter shared between POST /api/events and GET /api/events/stream
 export const apiEventEmitter = new EventEmitter()
 // Prevent memory-leak warnings when many SSE clients connect
 apiEventEmitter.setMaxListeners(100)
 
-function readTaskContent(projectRoot: string, filePath: string | null): string | null {
-    if (!filePath) return null
-    const full = join(projectRoot, filePath)
-    if (!existsSync(full)) return null
-    return readFileSync(full, 'utf8')
-}
+const VALID_EVENT_TYPES = new Set<string>(EVENT_TYPES)
 
 export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot: string): void {
     // CORS for local UI development
@@ -58,7 +54,7 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
     app.get('/api/tasks/:id', (c) => {
         const task = getTask(db, c.req.param('id'))
         if (!task) return c.json({ error: 'Not found' }, 404)
-        const content = readTaskContent(projectRoot, task.file_path)
+        const content = readFileSafe(projectRoot, task.file_path)
         const comments = getCommentsForTask(db, task.id)
         return c.json({ ...task, content, comments })
     })
@@ -76,7 +72,11 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
             return c.json({ error: 'Missing required field: type' }, 400)
         }
 
-        const event = appendEvent(projectRoot, partial)
+        if (!VALID_EVENT_TYPES.has(partial.type)) {
+            return c.json({ error: `Invalid event type: ${partial.type}` }, 400)
+        }
+
+        const event = await appendEvent(projectRoot, partial)
         applyEvent(db, event)
         apiEventEmitter.emit('event', event)
 
@@ -85,8 +85,8 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
 
     // GET /api/events — paginated history
     app.get('/api/events', (c) => {
-        const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 500)
-        const offset = parseInt(c.req.query('offset') ?? '0', 10)
+        const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10) || 50, 500)
+        const offset = Math.max(parseInt(c.req.query('offset') ?? '0', 10) || 0, 0)
 
         const all = readEvents(projectRoot)
         const total = all.length
@@ -141,7 +141,7 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
         const all = getDecisions(db)
         const decision = all.find((d) => d.id === c.req.param('id'))
         if (!decision) return c.json({ error: 'Not found' }, 404)
-        const content = readTaskContent(projectRoot, decision.file_path)
+        const content = readFileSafe(projectRoot, decision.file_path)
         return c.json({ ...decision, content })
     })
 

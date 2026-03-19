@@ -6,11 +6,11 @@ export function registerMigrateCommand(program: Command): void {
     program
         .command('migrate')
         .description('Migrate existing AIPIM 1.x project to 2.0 (events.jsonl + SQLite)')
-        .action(() => {
+        .action(async () => {
             logger.info('Scanning existing project...')
 
             try {
-                const result = migrate(process.cwd())
+                const result = await migrate(process.cwd())
 
                 if (result.skipped > 0) {
                     logger.info(`Already migrated: ${result.skipped} events preserved`)

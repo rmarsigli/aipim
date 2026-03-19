@@ -17,7 +17,7 @@ export interface MigrationResult {
  *
  * Safe to run multiple times — idempotent.
  */
-export function migrate(projectRoot: string): MigrationResult {
+export async function migrate(projectRoot: string): Promise<MigrationResult> {
     const existing = readEvents(projectRoot)
     if (existing.length > 0) {
         return { tasksFound: 0, eventsGenerated: 0, skipped: existing.length }
@@ -38,7 +38,7 @@ export function migrate(projectRoot: string): MigrationResult {
             const { data: fm } = matter(content)
 
             tasksFound++
-            appendEvent(projectRoot, {
+            await appendEvent(projectRoot, {
                 type: 'task.created',
                 taskId,
                 title: String(fm.title ?? file),
@@ -49,7 +49,7 @@ export function migrate(projectRoot: string): MigrationResult {
             eventsGenerated++
 
             if (fm.assignee) {
-                appendEvent(projectRoot, {
+                await appendEvent(projectRoot, {
                     type: 'task.assigned',
                     taskId,
                     assignee: String(fm.assignee)
@@ -71,7 +71,7 @@ export function migrate(projectRoot: string): MigrationResult {
             const { data: fm } = matter(content)
 
             tasksFound++
-            appendEvent(projectRoot, {
+            await appendEvent(projectRoot, {
                 type: 'task.created',
                 taskId,
                 title: String(fm.title ?? file),
@@ -81,7 +81,7 @@ export function migrate(projectRoot: string): MigrationResult {
             })
             eventsGenerated++
 
-            appendEvent(projectRoot, {
+            await appendEvent(projectRoot, {
                 type: 'task.completed',
                 taskId,
                 notes: 'Migrated from completed/ directory',
