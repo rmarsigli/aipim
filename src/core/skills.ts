@@ -30,6 +30,102 @@ export class SkillRegistry {
             name: 'Strict TypeScript',
             description: 'Strict TypeScript rules banning any and enforcing explicit returns',
             templateRelativePath: 'skills/typescript.md'
+        },
+        {
+            id: 'laravel',
+            name: 'Laravel',
+            description: 'Eloquent, controllers, policies, queues and config best practices',
+            templateRelativePath: 'skills/laravel.md'
+        },
+        {
+            id: 'react',
+            name: 'React',
+            description: 'Functional components, hooks rules, state and effect guidelines',
+            templateRelativePath: 'skills/react.md'
+        },
+        {
+            id: 'vue',
+            name: 'Vue 3',
+            description: 'Composition API, script setup, reactivity and composable guidelines',
+            templateRelativePath: 'skills/vue.md'
+        },
+        {
+            id: 'rest-api',
+            name: 'REST API Design',
+            description: 'HTTP verbs, status codes, versioning, pagination and naming conventions',
+            templateRelativePath: 'skills/rest-api.md'
+        },
+        {
+            id: 'php',
+            name: 'Modern PHP',
+            description: 'Type declarations, enums, match, readonly and PSR-12 guidelines',
+            templateRelativePath: 'skills/php.md'
+        },
+        {
+            id: 'security',
+            name: 'Secure Coding',
+            description: 'Input validation, SQL injection, XSS, secrets and auth guidelines',
+            templateRelativePath: 'skills/security.md'
+        },
+        {
+            id: 'vitest',
+            name: 'Vitest / Jest',
+            description: 'Test structure, mocking, isolation and async assertion guidelines',
+            templateRelativePath: 'skills/vitest.md'
+        },
+        {
+            id: 'svelte',
+            name: 'Svelte 5',
+            description: 'Runes, $state, $derived, $effect and $props guidelines',
+            templateRelativePath: 'skills/svelte.md'
+        },
+        {
+            id: 'python',
+            name: 'Python',
+            description: 'Type hints, dataclasses, pathlib, async and exception guidelines',
+            templateRelativePath: 'skills/python.md'
+        },
+        {
+            id: 'rust',
+            name: 'Rust',
+            description: 'Ownership, Result, iterators, traits and unsafe guidelines',
+            templateRelativePath: 'skills/rust.md'
+        },
+        {
+            id: 'langchain',
+            name: 'LangChain / LangGraph',
+            description: 'LCEL, structured output, agent state and observability guidelines',
+            templateRelativePath: 'skills/langchain.md'
+        },
+        {
+            id: 'django',
+            name: 'Django',
+            description: 'ORM, views, signals, migrations and settings best practices',
+            templateRelativePath: 'skills/django.md'
+        },
+        {
+            id: 'fastapi',
+            name: 'FastAPI',
+            description: 'Pydantic models, dependency injection, async routes and routers',
+            templateRelativePath: 'skills/fastapi.md'
+        },
+        {
+            id: 'docker',
+            name: 'Docker',
+            description: 'Layer caching, multi-stage builds, non-root user and secrets guidelines',
+            templateRelativePath: 'skills/docker.md'
+        },
+        {
+            id: 'prisma',
+            name: 'Prisma ORM',
+            description: 'Singleton client, transactions, migrations and type-safe queries',
+            templateRelativePath: 'skills/prisma.md'
+        },
+        {
+            id: 'nextjs',
+            name: 'Next.js App Router',
+            description: 'Server components, data fetching, Server Actions and metadata guidelines',
+            templateRelativePath: 'skills/nextjs.md'
         }
     ]
 
