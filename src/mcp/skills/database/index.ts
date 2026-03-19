@@ -1,12 +1,23 @@
 import Database from 'better-sqlite3'
 import { McpTool, ToolContext } from '../../tools/index.js'
+import { ActiveSkill } from '../types.js'
 import path from 'path'
 
 function getLocalDb(dbPath: unknown, projectRoot: string): Database.Database {
-    let resolvedPath = path.join(projectRoot, '.project/data.db')
+    const resolvedRoot = path.resolve(projectRoot)
+    let resolvedPath = path.join(resolvedRoot, '.project/data.db')
 
     if (typeof dbPath === 'string' && dbPath.trim() !== '') {
-        resolvedPath = path.isAbsolute(dbPath) ? dbPath : path.join(projectRoot, dbPath)
+        const candidate = path.resolve(projectRoot, dbPath)
+        // Prevent path traversal: the resolved path must remain inside the project root.
+        // better-sqlite3's prepare() also rejects multi-statement queries, so compound
+        // injection via SQL is not possible through this guard.
+        if (!candidate.startsWith(resolvedRoot + path.sep) && candidate !== resolvedRoot) {
+            throw new Error(
+                `Security Error: Database path '${dbPath}' is outside the project root. Only paths within the project directory are allowed.`
+            )
+        }
+        resolvedPath = candidate
     }
 
     return new Database(resolvedPath, { fileMustExist: true })
@@ -96,7 +107,7 @@ export const aipimDbQuery: McpTool = {
     }
 }
 
-export const databaseSkill = {
+export const databaseSkill: ActiveSkill = {
     id: 'database',
     tools: [aipimDbSchema, aipimDbQuery]
 }
