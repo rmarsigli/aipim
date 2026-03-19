@@ -8,6 +8,7 @@ import Database from 'better-sqlite3'
 import { queryTasks, getTask, getCommentsForTask, getDecisions, getStats, applyEvent } from '../core/db.js'
 import { appendEvent, readEvents, readEventsForTask } from '../core/events.js'
 import { loadConfig } from '../core/team.js'
+import { validatePath, SecurityError } from '../utils/path-validator.js'
 import { AipimEvent } from '../types/index.js'
 
 // Module-level emitter shared between POST /api/events and GET /api/events/stream
@@ -169,10 +170,24 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
             return c.json({ error: 'Missing required field: content (string)' }, 400)
         }
 
-        const fullPath = join(projectRoot, task.file_path)
+        let fullPath: string
+        try {
+            fullPath = validatePath(task.file_path, projectRoot)
+        } catch (err) {
+            if (err instanceof SecurityError) return c.json({ error: 'Invalid file path' }, 403)
+            throw err
+        }
+
         if (!existsSync(fullPath)) return c.json({ error: 'File not found on disk' }, 404)
 
-        writeFileSync(fullPath, body.content, 'utf8')
+        try {
+            writeFileSync(fullPath, body.content, 'utf8')
+        } catch (err) {
+            const code = (err as NodeJS.ErrnoException).code
+            if (code === 'EACCES') return c.json({ error: 'Permission denied' }, 403)
+            return c.json({ error: 'Failed to write file' }, 500)
+        }
+
         return c.json({ ok: true })
     })
 }

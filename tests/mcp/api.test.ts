@@ -239,6 +239,64 @@ describe('GET /api/decisions', () => {
     })
 })
 
+// ─── PUT /api/tasks/:id/content ───────────────────────────────────────────────
+
+describe('PUT /api/tasks/:id/content', () => {
+    it('returns 404 for unknown task', async () => {
+        const res = await buildApp(db).fetch(
+            new Request('http://localhost/api/tasks/TASK-999/content', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: '# Updated' })
+            })
+        )
+        expect(res.status).toBe(404)
+    })
+
+    it('returns 400 when content field is missing', async () => {
+        seedTask(db, 'TASK-001')
+        const res = await buildApp(db).fetch(
+            new Request('http://localhost/api/tasks/TASK-001/content', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+        )
+        expect(res.status).toBe(400)
+    })
+
+    it('writes content to disk and returns ok', async () => {
+        const filePath = '.project/backlog/TASK-001.md'
+        writeFileSync(join(TEST_ROOT, filePath), '# Original', 'utf8')
+        seedTask(db, 'TASK-001', filePath)
+
+        const res = await buildApp(db).fetch(
+            new Request('http://localhost/api/tasks/TASK-001/content', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: '# Updated content' })
+            })
+        )
+        expect(res.status).toBe(200)
+        const body = (await res.json()) as { ok: boolean }
+        expect(body.ok).toBe(true)
+    })
+
+    it('rejects path traversal in file_path', async () => {
+        // Seed a task whose file_path escapes the project root
+        seedTask(db, 'TASK-001', '../../etc/passwd')
+
+        const res = await buildApp(db).fetch(
+            new Request('http://localhost/api/tasks/TASK-001/content', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: 'pwned' })
+            })
+        )
+        expect(res.status).toBe(403)
+    })
+})
+
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 
 describe('CORS headers', () => {

@@ -3,6 +3,7 @@ import { join, basename } from 'path'
 import { appendEvent } from '../../core/events.js'
 import { applyEvent, getTask, queryTasks } from '../../core/db.js'
 import { getMember } from '../../core/team.js'
+import { validatePath } from '../../utils/path-validator.js'
 import type { McpTool, ToolContext } from './index.js'
 
 function nextTaskId(ctx: ToolContext): string {
@@ -206,6 +207,10 @@ export const writeTools: McpTool[] = [
             mkdirSync(decisionsDir, { recursive: true })
 
             let filePath: string
+            if (existingFilePath) {
+                // Validate the caller-supplied path before trusting it
+                validatePath(existingFilePath, projectRoot)
+            }
             if (existingFilePath && existsSync(join(projectRoot, existingFilePath))) {
                 filePath = existingFilePath
             } else {
