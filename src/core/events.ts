@@ -1,7 +1,14 @@
-import { readFileSync, appendFileSync, existsSync } from 'fs'
+import { readFileSync, appendFileSync, existsSync, statSync } from 'fs'
 import { join } from 'path'
 import { AipimEvent } from '../types/index.js'
 import { resolveActor } from './team.js'
+
+interface EventsCache {
+    mtime: number
+    events: AipimEvent[]
+}
+
+const eventsCache = new Map<string, EventsCache>()
 
 // Loose input type — type discriminant is validated, extra fields pass through
 type PartialEvent = { type: AipimEvent['type'] } & Record<string, unknown>
@@ -31,16 +38,27 @@ export function appendEvent(projectRoot: string, partial: PartialEvent): AipimEv
 
 /**
  * Reads all events from events.jsonl, ordered by timestamp ascending.
+ * Results are cached by file mtime so repeated calls within the same request
+ * do not re-read or re-parse the file unless it has been modified.
  */
 export function readEvents(projectRoot: string): AipimEvent[] {
     const filePath = join(projectRoot, EVENTS_FILE)
     if (!existsSync(filePath)) return []
 
-    return readFileSync(filePath, 'utf8')
+    const mtime = statSync(filePath).mtimeMs
+    const cached = eventsCache.get(projectRoot)
+    if (cached && cached.mtime === mtime) {
+        return cached.events
+    }
+
+    const events = readFileSync(filePath, 'utf8')
         .split('\n')
         .filter((line) => line.trim())
         .map((line) => JSON.parse(line) as AipimEvent)
         .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+
+    eventsCache.set(projectRoot, { mtime, events })
+    return events
 }
 
 /**
