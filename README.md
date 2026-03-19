@@ -12,12 +12,9 @@
 
 > **Artificial Intelligence Project Instruction Manager** — event-sourced project management with MCP server.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-2.0.0--alpha-blue)]()
-
 ## What it is
 
-AIPIM 2.0 is a project manager built around an **append-only event log**. All state (tasks, comments, decisions, assignments) derives from `events.jsonl`. A SQLite database is rebuilt from those events at startup and used as a fast read model.
+AIPIM 2.x is a project manager built around an **append-only event log**. All state (tasks, comments, decisions, assignments) derives from `events.jsonl`. A SQLite database is rebuilt from those events at startup and used as a fast read model.
 
 An **MCP server** (Model Context Protocol) exposes tools that Claude Code calls directly — no copy-paste, no clipboard workflow. A **REST API** serves the same data for the Svelte UI.
 
