@@ -94,3 +94,8 @@
 {"type":"task.content_updated","taskId":"TASK-015","id":"1771635038646-yk9g","timestamp":"2026-02-21T00:50:38.646Z","actor":"rmarsigli@gmail.com"}
 {"type":"task.status_changed","taskId":"TASK-015","from":"blocked","to":"done","id":"1771635065639-okjl","timestamp":"2026-02-21T00:51:05.639Z","actor":"rmarsigli@gmail.com"}
 {"type":"task.status_changed","taskId":"TASK-015","from":"done","to":"blocked","id":"1771635088121-29se","timestamp":"2026-02-21T00:51:28.122Z","actor":"rmarsigli@gmail.com"}
+{"type":"task.created","taskId":"TASK-001-SKILLS","title":"Implement Skills as Context Modules","taskType":"feat","priority":"P1-L","filePath":".project/completed/2026-03-19-T001-implement-skills-module.md","id":"1773948070781-wqva","timestamp":"2026-03-19T19:21:10.781Z","actor":"rmarsigli@gmail.com"}
+{"type":"task.completed","taskId":"TASK-001-SKILLS","notes":"Completed via agent","actualHours":4,"id":"1773948070830-1l8m","timestamp":"2026-03-19T19:21:10.830Z","actor":"rmarsigli@gmail.com"}
+{"type":"task.created","taskId":"TASK-002-MCP","title":"Implement Active Skills (MCP Tools)","taskType":"feat","priority":"P1-L","filePath":".project/backlog/T002-active-mcp-skills.md","id":"1773948070858-bbeo","timestamp":"2026-03-19T19:21:10.858Z","actor":"rmarsigli@gmail.com"}
+{"type":"task.status_changed","taskId":"TASK-002-MCP","from":"backlog","to":"in-progress","id":"1773948070888-rlxu","timestamp":"2026-03-19T19:21:10.888Z","actor":"rmarsigli@gmail.com"}
+{"type":"task.completed","taskId":"TASK-002-MCP","actualHours":3,"id":"1773948419105-t354","timestamp":"2026-03-19T19:26:59.105Z","actor":"rmarsigli@gmail.com"}

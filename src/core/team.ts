@@ -12,7 +12,7 @@ export interface TeamMember {
 }
 
 export interface ProjectConfig {
-    project: { name: string; description?: string }
+    project: { name: string; description?: string; active_skills?: string[] }
     team: TeamMember[]
 }
 

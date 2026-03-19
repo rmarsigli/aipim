@@ -169,6 +169,7 @@ Claude Code has access to these tools via the MCP server:
 [project]
 name = "MyApp"
 description = "..."
+active_skills = ["database"] # Dynamically enables local MCP tools per project
 
 [[team]]
 id = "alice"

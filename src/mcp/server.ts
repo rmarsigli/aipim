@@ -7,7 +7,8 @@ import { dirname, join } from 'path'
 import { readEvents } from '../core/events.js'
 import { rebuild, openDb } from '../core/db.js'
 import { migrate } from '../core/migrator.js'
-import { ALL_TOOLS } from './tools/index.js'
+import { CORE_TOOLS } from './tools/index.js'
+import { activeSkillRegistry } from './skills/registry.js'
 import { registerApiRoutes } from './api.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -66,10 +67,13 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
         }
 
         if (body.method === 'tools/list') {
+            const activeTools = activeSkillRegistry.getActiveTools(projectRoot)
+            const allTools = [...CORE_TOOLS, ...activeTools]
+
             return c.json({
                 jsonrpc: '2.0',
                 id: body.id,
-                result: { tools: ALL_TOOLS.map((t) => t.schema) }
+                result: { tools: allTools.map((t) => t.schema) }
             })
         }
 
@@ -78,7 +82,10 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
             const toolName = params.name as string | undefined
             const toolArgs = (params.arguments ?? {}) as Record<string, unknown>
 
-            const tool = ALL_TOOLS.find((t) => t.schema.name === toolName)
+            const activeTools = activeSkillRegistry.getActiveTools(projectRoot)
+            const allTools = [...CORE_TOOLS, ...activeTools]
+
+            const tool = allTools.find((t) => t.schema.name === toolName)
             if (!tool) {
                 return c.json({
                     jsonrpc: '2.0',
