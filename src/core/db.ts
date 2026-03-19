@@ -4,6 +4,23 @@ import { AipimEvent } from '../types/index.js'
 
 const DB_FILE = '.project/data.db'
 
+// Shared ORDER BY clause for priority sorting: P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3
+const PRIORITY_ORDER_SQL = `
+    ORDER BY
+        CASE SUBSTR(priority, 1, 2)
+            WHEN 'P1' THEN 1
+            WHEN 'P2' THEN 2
+            WHEN 'P3' THEN 3
+            ELSE 4
+        END,
+        CASE SUBSTR(priority, 4, 1)
+            WHEN 'S' THEN 1
+            WHEN 'M' THEN 2
+            WHEN 'L' THEN 3
+            ELSE 4
+        END,
+        created_at ASC`
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS tasks (
     id          TEXT PRIMARY KEY,
@@ -211,20 +228,7 @@ export function queryTasks(
         params.push(filter.priority + '%')
     }
 
-    sql += ` ORDER BY
-        CASE SUBSTR(priority, 1, 2)
-            WHEN 'P1' THEN 1
-            WHEN 'P2' THEN 2
-            WHEN 'P3' THEN 3
-            ELSE 4
-        END,
-        CASE SUBSTR(priority, 4, 1)
-            WHEN 'S' THEN 1
-            WHEN 'M' THEN 2
-            WHEN 'L' THEN 3
-            ELSE 4
-        END,
-        created_at ASC`
+    sql += PRIORITY_ORDER_SQL
 
     return db.prepare(sql).all(...params) as TaskRow[]
 }
@@ -234,27 +238,9 @@ export function queryTasks(
  * Order: P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3, then oldest first on tie.
  */
 export function getNextTask(db: Database.Database): TaskRow | undefined {
-    return db
-        .prepare(
-            `SELECT * FROM tasks
-             WHERE status = 'backlog'
-             ORDER BY
-                 CASE SUBSTR(priority, 1, 2)
-                     WHEN 'P1' THEN 1
-                     WHEN 'P2' THEN 2
-                     WHEN 'P3' THEN 3
-                     ELSE 4
-                 END,
-                 CASE SUBSTR(priority, 4, 1)
-                     WHEN 'S' THEN 1
-                     WHEN 'M' THEN 2
-                     WHEN 'L' THEN 3
-                     ELSE 4
-                 END,
-                 created_at ASC
-             LIMIT 1`
-        )
-        .get() as TaskRow | undefined
+    return db.prepare(`SELECT * FROM tasks WHERE status = 'backlog'${PRIORITY_ORDER_SQL} LIMIT 1`).get() as
+        | TaskRow
+        | undefined
 }
 
 export function getTask(db: Database.Database, taskId: string): TaskRow | undefined {

@@ -10,6 +10,10 @@ import { migrate } from '../core/migrator.js'
 import { CORE_TOOLS } from './tools/index.js'
 import { activeSkillRegistry } from './skills/registry.js'
 import { registerApiRoutes } from './api.js'
+import { version } from '../version.js'
+
+// MCP specification version — update only when the protocol itself changes
+const MCP_PROTOCOL_VERSION = '2024-11-05'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -55,9 +59,9 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
                 jsonrpc: '2.0',
                 id: body.id,
                 result: {
-                    protocolVersion: '2024-11-05',
+                    protocolVersion: MCP_PROTOCOL_VERSION,
                     capabilities: { tools: {} },
-                    serverInfo: { name: 'aipim', version: '2.0.0' }
+                    serverInfo: { name: 'aipim', version }
                 }
             })
         }

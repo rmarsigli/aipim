@@ -96,11 +96,9 @@ function parseTaskFile(filePath: string, initialStatus: TaskNode['status']): Tas
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseFrontmatter(content: string): Record<string, any> {
+function parseFrontmatter(content: string): Record<string, unknown> {
     const lines = content.split('\n')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const frontmatter: Record<string, any> = {}
+    const frontmatter: Record<string, unknown> = {}
     let inFrontmatter = false
     let currentCtx: string | null = null // for arrays
 
