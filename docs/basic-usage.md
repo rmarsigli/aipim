@@ -42,6 +42,19 @@ You never need to edit `events.jsonl` or the SQLite database manually.
 
 `.project/context.md` is for session state you want the AI to remember across conversations: current branch, active decisions, next action. Keep it short — it's loaded into context at session start.
 
+### Modular Skills
+
+As your project grows, you might integrate new tools like **Tailwind**, **Pest PHP**, or adopt **Strict TypeScript**. Instead of re-running the full installer, you can inject modular guidelines (Skills):
+
+```bash
+# See which skills are built-in
+aipim list skills
+
+# Inject Tailwind CSS guidelines into your active prompt context safely
+aipim add skill tailwind
+```
+AIPIM will automatically recalculate file signatures and gracefully append the rules inside your `.md` files without destroying custom content. If you're on a Laravel Boost project, it elegantly scopes the skill to its own `.blade.php` file in `.ai/guidelines/`.
+
 ---
 
 ## Task files
