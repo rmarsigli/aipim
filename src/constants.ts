@@ -15,7 +15,8 @@ export const PROMPTS = {
     CLAUDE: 'CLAUDE.md',
     GEMINI: 'GEMINI.md',
     CURSOR: 'CURSOR.md',
-    CURSOR_RULES: '.cursorrules'
+    CURSOR_RULES: '.cursorrules',
+    LARAVEL_BOOST: '.ai/guidelines/aipim.blade.php'
 } as const
 
 export const PROJECT_STRUCTURE = [
@@ -33,5 +34,6 @@ export const PROJECT_STRUCTURE = [
 export const AI_TOOLS = {
     CLAUDE_CODE: 'claude-code',
     GEMINI: 'gemini',
-    CURSOR: 'cursor'
+    CURSOR: 'cursor',
+    LARAVEL_BOOST: 'laravel-boost'
 } as const

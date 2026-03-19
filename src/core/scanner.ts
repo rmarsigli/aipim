@@ -22,9 +22,9 @@ export class ProjectScanner {
         const results: FileScanResult[] = []
 
         // Define default files to check if not provided
-        // We typically check CLAUDE.md, GEMINI.md (prompt files only)
+        // We typically check CLAUDE.md, GEMINI.md, and nested AI guidelines (e.g. .ai/guidelines/aipim.blade.php)
         // .project/ files are created on-demand by commands, not tracked by updater
-        const targets = filesToScan || ['CLAUDE.md', 'GEMINI.md']
+        const targets = filesToScan || ['CLAUDE.md', 'GEMINI.md', '.ai/guidelines/aipim.blade.php']
 
         const tasks = targets.map(async (relativePath) => {
             let absolutePath = path.join(projectRoot, relativePath)

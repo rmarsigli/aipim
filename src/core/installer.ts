@@ -122,6 +122,15 @@ async function generatePrompt(ai: string, config: InstallConfig, templatesDir: s
     // Sign the content
     const signedPrompt = signatureManager.sign(basePrompt)
 
+    // Ensure directory exists for the prompt file if it's nested
+    const fileDir = path.dirname(filename)
+    if (fileDir !== '.') {
+        const fullDir = path.join(process.cwd(), fileDir)
+        if (!config.dryRun) {
+            await fs.ensureDir(fullDir)
+        }
+    }
+
     if (config.dryRun) {
         logger.info(`[DRY RUN] Would write prompt file: ${filename} (${signedPrompt.length} bytes)`)
     } else {
@@ -140,7 +149,8 @@ function getPromptFilename(ai: string): string {
         'claude-code': 'CLAUDE.md',
         'claude-ai': 'CLAUDE.md',
         gemini: 'GEMINI.md',
-        cursor: 'CURSOR.md'
+        cursor: 'CURSOR.md',
+        'laravel-boost': '.ai/guidelines/aipim.blade.php'
     }
 
     return filenames[ai] || `${ai.toUpperCase()}.md`
