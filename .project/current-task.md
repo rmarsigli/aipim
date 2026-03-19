@@ -1,77 +1,86 @@
 ---
-title: "No Active Task"
-created: 2026-01-19T14:15:00-03:00
-last_updated: 2026-01-19T14:15:00-03:00
-priority: N/A
-estimated_hours: 0
+title: "Implement Skills as Context Modules"
+created: 2026-03-19T15:50:00-03:00
+last_updated: 2026-03-19T15:50:00-03:00
+priority: P1-L
+estimated_hours: 11
 actual_hours: 0
-status: idle
+status: backlog
 blockers: []
-tags: []
-related_files: []
+tags: [backend, cli, skills, core, architecture]
+related_files: ["src/cli.ts", "src/core/guidelines.ts", "src/core/installer.ts"]
 ---
 
-# No Active Task
+# Task: Implement Skills as Context Modules
 
-## Current Status
+## Objective
 
-**All quality improvement tasks completed!** ✅
+Implement the "Context Modules" (Skills) architecture for AIPIM, allowing developers to dynamically add fine-grained, tool-specific AI guidelines to an existing project without bloating the base prompt. 
 
-**Completed in Session 9:**
-- T029: Audit execSync Security (already complete, verified)
-- T030: Create Architecture ADRs (8 total)
-- T031: Remove Commented Debug Code
+**Success:**
+- [ ] Users can run `aipim list skills` to view available contextual modules.
+- [ ] Users can run `aipim add skill <name>` to seamlessly inject a skill (e.g., pest, tailwind).
+- [ ] Skills gracefully adapt to the environment (e.g., injecting into `CLAUDE.md` slots or generating isolated `.blade.php` files for Laravel Boost contexts).
 
-**Sprint Summary:**
-- Sprint 1: ✅ COMPLETE (T016-T019) - Critical blockers
-- Sprint 2: ✅ COMPLETE (T020-T022) - Testing infrastructure
-- Sprint 3: ✅ COMPLETE (T023-T029) - Performance & Security
-- Sprint 4: ✅ COMPLETE (T030-T031) - Documentation & Cleanup
+## Context
 
-**Total Tasks Completed:** 31 tasks
-- TASK-001 to TASK-010
-- T016 to T031
+**Why:** Currently, AIPIM generates a monolithic prompt file or predefined guidelines upon installation. As projects evolve, developers adopt new tools (like Pest, Tailwind, or Redis) and need a way to easily "teach" their AI agents the strict rules, security gotchas, and specific context of these tools without having to re-run the entire `aipim update` with a new monolithic configuration.
 
-## Next Actions
+## Implementation
 
-1. **Immediate:**
-   - Request new code quality analysis report
-   - Validate quality improvements (target: 85-90+ score)
-   - Review recommendations
+### Phase 1: Architecture & CLI Command (3h)
+- [ ] Create `src/commands/add.ts` implementing `add skill <name>`.
+- [ ] Create `src/commands/list.ts` implementing `list skills` (using `@inquirer/prompts` if interactive).
+- [ ] Register new commands in `src/cli.ts` using Commander.
+- [ ] Scaffold `src/core/skills.ts` to manage the logic of reading and fetching skill definitions.
 
-2. **After Quality Report:**
-   - Create new tasks from recommendations (if any)
-   - Consider v1.2.0 release
-   - Plan next feature sprint
+### Phase 2: Skills Library & Templates (2h)
+- [ ] Create directory structure `src/templates/skills/`.
+- [ ] Author at least 3 initial skill templates (e.g., `pest.md` for Pest PHP, `tailwind.md` for Tailwind CSS best practices, `vue3-composition.md` for Vue 3).
+- [ ] Update `tsup.config.ts` or build pipelines if necessary to ensure `skills/` directory is copied to `dist/`.
 
-## Available Tasks
+### Phase 3: Context Injection Engine (4h)
+- [ ] Implement logical router in `src/core/skills.ts` to handle skill application based on project type.
+- [ ] **Standard Mode:** Implement injector that appends the skill content inside `CLAUDE.md/GEMINI.md/CURSOR.md` (e.g., via the `{{SLOT:guidelines}}` mechanism) and securely recalculates/updates the `@aipim-signature`.
+- [ ] **Laravel Boost Mode:** Implement injector that drops the skill content cleanly into `.ai/guidelines/<skill_name>.blade.php` instead of editing the monolithic file.
 
-**Backlog:** Empty (all critical tasks completed)
+### Phase 4: Testing & Documentation (2h)
+- [ ] Write Jest unit tests (`tests/commands/add-skill.test.ts`) covering both Standard and Laravel Boost injection behaviors.
+- [ ] Write Jest unit tests verifying that injecting a duplicate skill refuses to corrupt the file.
+- [ ] Update `README.md` and `/docs/basic-usage.md` reflecting the new `skills` capability.
 
-**To pick a new task:**
-```bash
-# List available backlog tasks (currently empty)
-ls -la .project/backlog/
+## Definition of Done
 
-# Create new task from template
-cp .project/_templates/task.md .project/current-task.md
+### Functionality
+- [ ] Works as specified
+- [ ] Edge cases: Trying to add a skill that doesn't exist returns a friendly error. Adding a skill twice warns the user and aborts.
+- [ ] Error messages user-friendly
 
-# Or request quality analysis to generate new tasks
-```
+### Testing
+- [ ] Unit tests: `src/core/skills.ts`, CLI commands
+- [ ] Coverage >80% for new modules
 
-## Quality Metrics
+### Code Quality
+- [ ] PSR-12 / ESLint compliant
+- [ ] Complex logic documented
+- [ ] No debug statements
+- [ ] Clean names
 
-**Current Status:**
-- Tests: 121/121 passing (16 suites)
-- Lint: 0 warnings, 0 errors
-- Debug code: 0 (cleaned)
-- ADRs: 8 (comprehensive architecture documentation)
-- Security: execSync eliminated, path validation added
-- Documentation: JSDoc added to all core modules
+### Documentation
+- [ ] Time logged
+- [ ] README updated with new `aipim add skill` commands
+- [ ] ADR generated detailing the Skills architecture vs Guidelines architecture
 
-**Quality Score Projection:**
-- Previous: 80.6/100
-- Expected: 87-90/100
-- Improvements: +6-9 points across all categories
+### Git
+- [ ] Atomic commits mapping directly to the phases (Ex: `feat(core): implement skills injection engine`)
+- [ ] Convention: type(scope): msg
+- [ ] No conflicts
 
-**Ready for quality re-analysis!**
+## Blockers & Risks
+
+**Current:**
+- [ ] None
+
+**Potential:**
+1. Risk: Signature corruption when injecting into existing `CLAUDE.md` files that have been hand-edited.
+   - Mitigation: Ensure `add skill` checks the file signature before proceeding. If invalid (legacy/tampered), warn the user to run `aipim update` first or use a `--force` flag.

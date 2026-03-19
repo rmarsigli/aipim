@@ -8,6 +8,8 @@ import { update } from './commands/update.js'
 import { validate } from './commands/validate.js'
 import { version } from './version.js'
 import { logger } from '@/utils/logger.js'
+import { addSkill } from './commands/add.js'
+import { listSkills } from './commands/list.js'
 
 const program = new Command()
 
@@ -102,6 +104,31 @@ program.addCommand(deps)
 
 import { completion } from './commands/completion.js'
 import { registerTaskCommand } from './commands/task.js'
+
+program
+    .command('list')
+    .description('List available additions (skills)')
+    .argument('<type>', 'Type of item to list (e.g., "skills")')
+    .action((type: string) => {
+        if (type !== 'skills') {
+            console.error(chalk.red('\nError: Only "skills" is supported right now. Try: aipim list skills\n'))
+            process.exit(1)
+        }
+        listSkills()
+    })
+
+program
+    .command('add')
+    .description('Add an extension module to the current project')
+    .argument('<type>', 'Type of item to add (e.g., "skill")')
+    .argument('<name>', 'Name of the item to add')
+    .action(async (type: string, name: string) => {
+        if (type !== 'skill') {
+            console.error(chalk.red('\nError: Only "skill" is supported right now. Try: aipim add skill <name>\n'))
+            process.exit(1)
+        }
+        await addSkill(name)
+    })
 import { registerMigrateCommand } from './commands/migrate.js'
 import { registerMcpCommand } from './commands/mcp.js'
 import { registerTeamCommand } from './commands/team.js'
