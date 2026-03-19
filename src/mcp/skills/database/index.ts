@@ -73,7 +73,9 @@ export const aipimDbQuery: McpTool = {
     handler: (ctx: ToolContext, args: Record<string, unknown>) => {
         const query = typeof args.query === 'string' ? args.query.trim() : ''
 
-        // Strict safety check for read-only
+        // Strict safety check for read-only. Checking only the start of the query is sufficient
+        // because better-sqlite3's prepare() rejects multi-statement strings (e.g. "SELECT 1; DROP TABLE...")
+        // at the driver level, so a compound injection cannot bypass this guard.
         const forbiddenVerbs = /^\s*(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|GRANT|REVOKE|REPLACE|TRUNCATE)\b/i
         if (forbiddenVerbs.test(query)) {
             throw new Error(

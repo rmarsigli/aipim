@@ -14,7 +14,6 @@ export async function addSkill(skillId: string): Promise<void> {
 
     try {
         await skillRegistry.injectSkill(skillId, process.cwd())
-        // logger.success happens inside injectSkill currently once implemented fully
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
         logger.error(`Failed to add skill: ${message}`)
