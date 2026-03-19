@@ -4,7 +4,9 @@ import { ActiveSkill } from '../types.js'
 import path from 'path'
 
 function getLocalDb(dbPath: unknown, projectRoot: string): Database.Database {
-    const resolvedRoot = path.resolve(projectRoot)
+    // Normalize resolvedRoot to always end without a trailing separator so that
+    // startsWith(resolvedRoot + path.sep) works correctly on all platforms (incl. Windows).
+    const resolvedRoot = path.resolve(projectRoot).replace(/[/\\]$/, '')
     let resolvedPath = path.join(resolvedRoot, '.project/data.db')
 
     if (typeof dbPath === 'string' && dbPath.trim() !== '') {
@@ -48,6 +50,12 @@ export const aipimDbSchema: McpTool = {
 
             const schema: Record<string, unknown> = {}
             for (const table of tablesQuery) {
+                // Validate table name before using it in a pragma to prevent any
+                // unexpected injection — even though names come from sqlite_master.
+                if (!/^[a-zA-Z0-9_]+$/.test(table.name)) {
+                    schema[table.name] = { error: 'Skipped: table name contains unsafe characters.' }
+                    continue
+                }
                 const info = db.pragma(`table_info("${table.name}")`)
                 schema[table.name] = info
             }

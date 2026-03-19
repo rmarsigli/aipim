@@ -90,9 +90,13 @@ export const writeTools: McpTool[] = [
                 const srcFull = join(projectRoot, task.file_path)
                 const destFull = join(projectRoot, dest)
                 mkdirSync(join(projectRoot, '.project/completed'), { recursive: true })
-                if (existsSync(srcFull)) {
+                try {
                     renameSync(srcFull, destFull)
                     fileMoved = dest
+                } catch (err) {
+                    // File may not exist if the task was created without a markdown file — ignore.
+                    const code = (err as NodeJS.ErrnoException).code
+                    if (code !== 'ENOENT') throw err
                 }
             }
 
