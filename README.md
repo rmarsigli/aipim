@@ -39,7 +39,7 @@ All writes go through `appendEvent() → applyEvent()`. The database is never wr
 
 ```bash
 # Install globally
-npm install -g aipim
+pnpm install -g aipim
 
 # Initialize in your project
 cd my-project
@@ -131,6 +131,56 @@ aipim team add         # interactive wizard to add a member
 aipim team setup-git   # configure .gitattributes with union merge for events.jsonl
 ```
 
+### `aipim list skills`
+
+Lists all built-in context skills available to inject.
+
+```bash
+aipim list skills
+```
+
+```
+Available Skills:
+
+  pest            Pest PHP
+                  Best practices for the Pest PHP testing framework
+
+  tailwind        TailwindCSS v4
+                  Maintainable utility-first class management guidelines
+
+  typescript      Strict TypeScript
+                  Strict TypeScript rules banning any and enforcing explicit returns
+
+  laravel         Laravel
+  react           React
+  vue             Vue 3
+  rest-api        REST API Design
+  php             Modern PHP
+  security        Secure Coding
+  vitest          Vitest / Jest
+  svelte          Svelte 5
+  python          Python
+  rust            Rust
+  langchain       LangChain / LangGraph
+  django          Django
+  fastapi         FastAPI
+  docker          Docker
+  prisma          Prisma ORM
+  nextjs          Next.js App Router
+```
+
+### `aipim add skill <name>`
+
+Injects a skill's guidelines into `CLAUDE.md` or `GEMINI.md` (standard mode), or into `.ai/guidelines/skill-<name>.blade.php` (Laravel Boost mode). The operation is idempotent — running it twice does not duplicate the content.
+
+```bash
+aipim add skill typescript
+aipim add skill react
+aipim add skill security
+```
+
+The skill block is inserted inside the `{{SLOT:guidelines}} … {{/SLOT:guidelines}}` marker in your AI instruction file and the file signature is recalculated automatically.
+
 ### `aipim migrate`
 
 One-time migration from AIPIM 1.x. Reads `.project/backlog/*.md` and `.project/completed/*.md`, generates synthetic events, rebuilds SQLite.
@@ -142,6 +192,38 @@ Updates scaffolded files (templates, scripts) without overwriting customizations
 ### `aipim validate`
 
 Checks directory structure, script permissions, and file signatures.
+
+## Skills
+
+AIPIM has two complementary skill systems:
+
+### Context Modules (`aipim add skill`)
+
+Inject focused coding guidelines directly into your AI instruction file (`CLAUDE.md`, `GEMINI.md`, or `.ai/guidelines/` for Laravel Boost projects). These become part of the model's context on every session — no need to re-explain conventions.
+
+19 built-in skills cover: `pest`, `tailwind`, `typescript`, `laravel`, `react`, `vue`, `rest-api`, `php`, `security`, `vitest`, `svelte`, `python`, `rust`, `langchain`, `django`, `fastapi`, `docker`, `prisma`, `nextjs`.
+
+See [docs/skills-context.md](docs/skills-context.md) for details.
+
+### Active Skills (MCP Tools)
+
+Dynamic MCP tools that are enabled per-project via `active_skills` in `.project/config.toml`. They are merged with the core tools at runtime — no server restart needed.
+
+```toml
+[project]
+name = "MyApp"
+active_skills = ["database"]
+```
+
+Currently available:
+
+| Skill | Tools enabled | Description |
+|-------|--------------|-------------|
+| `database` | `aipim_db_schema`, `aipim_db_query` | Read-only access to any local SQLite database |
+
+`aipim_db_schema` returns the full table/column structure of a `.db` file. `aipim_db_query` executes `SELECT`/`EXPLAIN`/`PRAGMA` statements — write operations are blocked at the driver level.
+
+See [docs/skills-mcp.md](docs/skills-mcp.md) for details.
 
 ## MCP Tools
 
@@ -161,6 +243,8 @@ Claude Code has access to these tools via the MCP server:
 | `add_comment` | Append a comment (immutable) |
 | `log_decision` | Write an ADR to `decisions/` |
 
+Additional tools are injected dynamically based on `active_skills` — see [Skills](#skills) above.
+
 ## Team Configuration
 
 `.project/config.toml` is optional. Without it, AIPIM works as a solo-dev setup (actor = git email).
@@ -169,7 +253,7 @@ Claude Code has access to these tools via the MCP server:
 [project]
 name = "MyApp"
 description = "..."
-active_skills = ["database"] # Dynamically enables local MCP tools per project
+active_skills = ["database"]  # optional — see Skills section
 
 [[team]]
 id = "alice"
@@ -202,15 +286,15 @@ Actor resolution order: `AIPIM_USER` env → git `user.email` matched to a team 
 ## Development
 
 ```bash
-npm test           # 214 tests
-npm run lint       # eslint + prettier
-npm run build      # tsup → dist/
-npm run type-check
+pnpm test           # 238 tests
+pnpm lint           # eslint + prettier
+pnpm build          # tsup → dist/
+pnpm type-check
 
 # UI (Svelte 5 + Vite + Tailwind v4)
-cd ui && npm install
-npm run build      # → ui/dist/
-npm run dev        # Vite dev server on :5173 (proxies /api to :3141)
+cd ui && pnpm install
+pnpm build          # → ui/dist/
+pnpm dev            # Vite dev server on :5173 (proxies /api to :3141)
 ```
 
 ## Monorepo — why we didn't split
