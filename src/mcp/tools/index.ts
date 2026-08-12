@@ -19,6 +19,8 @@ export interface McpToolSchema {
 
 export interface McpTool {
     schema: McpToolSchema
+    /** Overrides the server's default tool timeout. Used by long-running tools like verify_task. */
+    timeoutMs?: number
     handler: (ctx: ToolContext, args: Record<string, unknown>) => unknown
 }
 

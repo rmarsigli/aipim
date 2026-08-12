@@ -2,6 +2,19 @@
 name = "My Project"
 description = "Project description"
 
+# Commands that must pass before a task can be completed.
+# With this set, complete_task is rejected unless verify_task recorded a passing
+# run for every command *after* the task last changed. Leave it out to disable
+# the gate entirely.
+# [checks]
+# commands = ["pnpm test", "pnpm lint"]
+
+# Claude Code hook behaviour (see `aipim hook install`).
+# block_on_unverified stops the agent from ending its turn while an in-progress
+# task still has failing or missing checks. Off by default.
+# [hooks]
+# block_on_unverified = true
+
 # Add team members below (optional — works as solo dev without this)
 # [[team]]
 # id = "alice"

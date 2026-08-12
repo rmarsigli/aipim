@@ -2,8 +2,10 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
 import matter from 'gray-matter'
-import { queryTasks, getNextTask, getBlockers, getTask, getCommentsForTask, getStats } from '../../core/db.js'
+import { queryTasks, getBlockers, getTask, getCommentsForTask, getStats, getDependencies } from '../../core/db.js'
+import { getNextReadyTask, loadTaskGraph } from '../../core/graph.js'
 import { readEventsForTask } from '../../core/events.js'
+import { getRequiredChecks } from '../../core/verification.js'
 import type { McpTool, ToolContext } from './index.js'
 
 function currentBranch(): string {
@@ -46,17 +48,20 @@ export const readTools: McpTool[] = [
             const stats = getStats(db)
             const total = Object.values(stats).reduce((a, b) => a + b, 0)
             const inProgress = queryTasks(db, { status: 'in-progress' })
-            const nextTask = getNextTask(db)
+            const nextTask = getNextReadyTask(db)
             const blockers = getBlockers(db)
             const recentEvents = events.slice(-10)
             const ctx = readContextMd(projectRoot)
             const branch = currentBranch()
+            const graph = loadTaskGraph(db)
 
             return {
                 stats: { total, byStatus: stats },
                 currentTask: inProgress[0] ?? null,
                 nextTask: nextTask ?? null,
                 blockers,
+                graph: { ready: graph.ready, blocked: graph.blocked, cycles: graph.cycles },
+                requiredChecks: getRequiredChecks(projectRoot),
                 recentEvents,
                 session: { number: ctx.session ?? null, branch, nextAction: ctx.nextAction ?? null }
             }
@@ -66,16 +71,38 @@ export const readTools: McpTool[] = [
     {
         schema: {
             name: 'get_next_task',
-            description: 'Get the next task to work on, ordered by real priority (P1-S first, not alphabetical).',
+            description:
+                'Get the next task to work on: the highest-priority task whose dependencies are all done. Blocked tasks are never returned.',
             inputSchema: { type: 'object', properties: {} }
         },
         handler: ({ db, projectRoot }: ToolContext): unknown => {
-            const task = getNextTask(db)
-            if (!task) return { message: 'No tasks in backlog. All done!' }
+            const task = getNextReadyTask(db)
+            if (!task) {
+                const graph = loadTaskGraph(db)
+                if (graph.blocked.length > 0) {
+                    return {
+                        message: 'Nothing is ready to start — every remaining task is blocked by a dependency.',
+                        blockedTasks: graph.blocked,
+                        cycles: graph.cycles
+                    }
+                }
+                return { message: 'No tasks in backlog. All done!' }
+            }
             const content = readFileSafe(projectRoot, task.file_path)
             const comments = getCommentsForTask(db, task.id)
-            return { ...task, content, comments }
+            const dependsOn = getDependencies(db, task.id)
+            return { ...task, content, comments, dependsOn }
         }
+    },
+
+    {
+        schema: {
+            name: 'get_task_graph',
+            description:
+                'Get the task dependency graph: every node with its edges, the ready frontier (what can start now), the blocked set, and any dependency cycles.',
+            inputSchema: { type: 'object', properties: {} }
+        },
+        handler: ({ db }: ToolContext): unknown => loadTaskGraph(db)
     },
 
     {

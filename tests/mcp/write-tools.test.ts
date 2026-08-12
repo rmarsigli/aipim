@@ -1,20 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import { openDb, applyEvent, getTask, queryTasks } from '../../src/core/db.js'
+import { openDb, rebuild, applyEvent, getTask, queryTasks, getChecksForTask, getDependencies } from '../../src/core/db.js'
 import { writeTools } from '../../src/mcp/tools/write.js'
 import type { ToolContext } from '../../src/mcp/tools/index.js'
 import type { TaskCreatedEvent } from '../../src/types/index.js'
 import Database from 'better-sqlite3'
 
 const TEST_ROOT = join(process.cwd(), 'tests/__fixtures__/write-tools-test')
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, title TEXT NOT NULL, task_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'backlog', priority TEXT NOT NULL, assignee TEXT, file_path TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), actor TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS decisions (id TEXT PRIMARY KEY, title TEXT NOT NULL, rationale TEXT NOT NULL, task_id TEXT, file_path TEXT, actor TEXT NOT NULL, created_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS events_log (id TEXT PRIMARY KEY, type TEXT NOT NULL, payload TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL);
-`
 
 function makeTool(name: string) {
     const tool = writeTools.find((t) => t.schema.name === name)
@@ -45,8 +38,9 @@ beforeEach(() => {
     mkdirSync(join(TEST_ROOT, '.project/backlog'), { recursive: true })
     // Ensure events.jsonl directory exists
     writeFileSync(join(TEST_ROOT, '.project/events.jsonl'), '', 'utf8')
+    // Use the real schema so these tests never drift from src/core/db.ts
+    rebuild(TEST_ROOT, [])
     db = openDb(TEST_ROOT)
-    db.exec(SCHEMA)
     ctx = { db, projectRoot: TEST_ROOT, events: [] }
 })
 
@@ -316,5 +310,270 @@ describe('assign_task', () => {
         await expect(tool.handler(ctx, { taskId: 'TASK-001', assignee: 'unknown' })).rejects.toThrow(
             'not found in config.toml'
         )
+    })
+})
+
+function writeChecksConfig(commands: string[]): void {
+    const list = commands.map((c) => JSON.stringify(c)).join(', ')
+    writeFileSync(
+        join(TEST_ROOT, '.project/config.toml'),
+        `[project]\nname = "Test"\n\n[checks]\ncommands = [${list}]\n`,
+        'utf8'
+    )
+}
+
+const PASSING = 'node -e "process.exit(0)"'
+const FAILING = 'node -e "process.exit(1)"'
+
+describe('verify_task', () => {
+    const tool = makeTool('verify_task')
+
+    it('throws when the task does not exist', async () => {
+        await expect(tool.handler(ctx, { taskId: 'TASK-999' })).rejects.toThrow('TASK-999 not found')
+    })
+
+    it('reports nothing to run when no checks are configured', async () => {
+        seedTask(db, 'TASK-001')
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.results).toEqual([])
+        expect(result.allPassed).toBe(true)
+    })
+
+    it('records a passing check as evidence', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([PASSING])
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.allPassed).toBe(true)
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks).toHaveLength(1)
+        expect(checks[0].passed).toBe(true)
+        expect(checks[0].command).toBe(PASSING)
+    })
+
+    it('records a failing check with its exit code', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([FAILING])
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.allPassed).toBe(false)
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks[0].passed).toBe(false)
+        expect(checks[0].exit_code).toBe(1)
+    })
+
+    it('appends a check.run event to the log', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([PASSING])
+
+        await tool.handler(ctx, { taskId: 'TASK-001' })
+
+        const content = readFileSync(join(TEST_ROOT, '.project/events.jsonl'), 'utf8')
+        const events = content.trim().split('\n').map((l) => JSON.parse(l))
+        const checkEvt = events.find((e: { type: string }) => e.type === 'check.run')
+        expect(checkEvt).toBeDefined()
+        expect(checkEvt.taskId).toBe('TASK-001')
+        expect(checkEvt.passed).toBe(true)
+    })
+
+    it('runs an explicit command list instead of the configured one', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([FAILING])
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001', commands: [PASSING] })) as Record<string, unknown>
+
+        expect(result.allPassed).toBe(true)
+        expect(getChecksForTask(db, 'TASK-001').map((c) => c.command)).toEqual([PASSING])
+    })
+
+    it('runs every configured command even when an earlier one fails', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([FAILING, PASSING])
+
+        await tool.handler(ctx, { taskId: 'TASK-001' })
+
+        expect(getChecksForTask(db, 'TASK-001')).toHaveLength(2)
+    })
+})
+
+describe('complete_task verification gate', () => {
+    const complete = makeTool('complete_task')
+    const verify = makeTool('verify_task')
+
+    it('refuses to complete when a required check never ran', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([PASSING])
+
+        await expect(complete.handler(ctx, { taskId: 'TASK-001' })).rejects.toThrow('verification gate')
+        expect(getTask(db, 'TASK-001')?.status).not.toBe('done')
+    })
+
+    it('refuses to complete when a required check failed', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([FAILING])
+        await verify.handler(ctx, { taskId: 'TASK-001' })
+
+        await expect(complete.handler(ctx, { taskId: 'TASK-001' })).rejects.toThrow('verification gate')
+    })
+
+    it('completes when every required check passed', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([PASSING])
+        ctx.events = [
+            {
+                id: 'seed',
+                type: 'task.created',
+                timestamp: '2020-01-01T00:00:00.000Z',
+                actor: 'test',
+                taskId: 'TASK-001',
+                title: 'T',
+                taskType: 'feat',
+                priority: 'P1-S',
+                filePath: '',
+            },
+        ]
+        await verify.handler(ctx, { taskId: 'TASK-001' })
+
+        const result = (await complete.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.success).toBe(true)
+        expect(getTask(db, 'TASK-001')?.status).toBe('done')
+    })
+
+    it('completes when force is set and records the bypass', async () => {
+        seedTask(db, 'TASK-001')
+        writeChecksConfig([PASSING])
+
+        const result = (await complete.handler(ctx, { taskId: 'TASK-001', force: true })) as Record<string, unknown>
+
+        expect(result.success).toBe(true)
+        expect(result.checksBypassed).toBe(true)
+
+        const content = readFileSync(join(TEST_ROOT, '.project/events.jsonl'), 'utf8')
+        const events = content.trim().split('\n').map((l) => JSON.parse(l))
+        const completedEvt = events.find((e: { type: string }) => e.type === 'task.completed')
+        expect(completedEvt.checksBypassed).toBe(true)
+    })
+})
+
+describe('add_dependency', () => {
+    const tool = makeTool('add_dependency')
+
+    it('throws when the task does not exist', async () => {
+        seedTask(db, 'TASK-001')
+        await expect(tool.handler(ctx, { taskId: 'TASK-999', dependsOn: 'TASK-001' })).rejects.toThrow('TASK-999 not found')
+    })
+
+    it('throws when the dependency does not exist', async () => {
+        seedTask(db, 'TASK-001')
+        await expect(tool.handler(ctx, { taskId: 'TASK-001', dependsOn: 'TASK-999' })).rejects.toThrow('TASK-999 not found')
+    })
+
+    it('records the edge in the read model', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        expect(getDependencies(db, 'TASK-002')).toEqual(['TASK-001'])
+    })
+
+    it('appends a task.dependency_added event', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        const content = readFileSync(join(TEST_ROOT, '.project/events.jsonl'), 'utf8')
+        const events = content.trim().split('\n').map((l) => JSON.parse(l))
+        const evt = events.find((e: { type: string }) => e.type === 'task.dependency_added')
+        expect(evt.taskId).toBe('TASK-002')
+        expect(evt.dependsOn).toBe('TASK-001')
+    })
+
+    it('refuses a self-dependency', async () => {
+        seedTask(db, 'TASK-001')
+
+        await expect(tool.handler(ctx, { taskId: 'TASK-001', dependsOn: 'TASK-001' })).rejects.toThrow('cycle')
+    })
+
+    it('refuses an edge that would create a cycle', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        await expect(tool.handler(ctx, { taskId: 'TASK-001', dependsOn: 'TASK-002' })).rejects.toThrow('cycle')
+    })
+
+    it('is idempotent when the edge already exists', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        expect(getDependencies(db, 'TASK-002')).toEqual(['TASK-001'])
+    })
+})
+
+describe('remove_dependency', () => {
+    const add = makeTool('add_dependency')
+    const tool = makeTool('remove_dependency')
+
+    it('drops the edge from the read model', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+        await add.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        expect(getDependencies(db, 'TASK-002')).toEqual([])
+    })
+
+    it('throws when the edge does not exist', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await expect(tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })).rejects.toThrow('No dependency')
+    })
+})
+
+describe('complete_task destination filename', () => {
+    const tool = makeTool('complete_task')
+
+    it('does not stack a second date prefix on an already dated file', async () => {
+        const filePath = '.project/backlog/2026-01-15-TASK-001-already-dated.md'
+        writeFileSync(join(TEST_ROOT, filePath), '# Task')
+        seedTask(db, 'TASK-001', { filePath })
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.fileMoved).not.toMatch(/\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}/)
+        expect(result.fileMoved).toMatch(/^\.project\/completed\/\d{4}-\d{2}-\d{2}-TASK-001-already-dated\.md$/)
+    })
+
+    it('dates the archived file by completion, not by creation', async () => {
+        const filePath = '.project/backlog/2020-01-15-TASK-001-old.md'
+        writeFileSync(join(TEST_ROOT, filePath), '# Task')
+        seedTask(db, 'TASK-001', { filePath })
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.fileMoved).not.toContain('2020-01-15')
+        expect(existsSync(join(TEST_ROOT, result.fileMoved as string))).toBe(true)
+    })
+
+    it('adds a date prefix to a file that has none', async () => {
+        const filePath = '.project/backlog/TASK-001-undated.md'
+        writeFileSync(join(TEST_ROOT, filePath), '# Task')
+        seedTask(db, 'TASK-001', { filePath })
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.fileMoved).toMatch(/^\.project\/completed\/\d{4}-\d{2}-\d{2}-TASK-001-undated\.md$/)
     })
 })

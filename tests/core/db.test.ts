@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
-import { openDb, rebuild, applyEvent, queryTasks, getNextTask, getTask, getBlockers, getCommentsForTask, getStats } from '../../src/core/db.js'
-import type { AipimEvent, TaskCreatedEvent, TaskStatusChangedEvent, TaskAssignedEvent, TaskCommentAddedEvent, TaskCompletedEvent } from '../../src/types/index.js'
+import { openDb, rebuild, applyEvent, queryTasks, getNextTask, getTask, getBlockers, getCommentsForTask, getStats, getChecksForTask, getDependencies, getDependents, getAllDependencies } from '../../src/core/db.js'
+import type { AipimEvent, TaskCreatedEvent, TaskStatusChangedEvent, TaskAssignedEvent, TaskCommentAddedEvent, TaskCompletedEvent, CheckRunEvent, TaskDependencyAddedEvent, TaskDependencyRemovedEvent } from '../../src/types/index.js'
 
 const TEST_ROOT = join(process.cwd(), 'tests/__fixtures__/db-test')
 
@@ -286,6 +286,189 @@ describe('getStats', () => {
         const stats = getStats(db)
         expect(stats['backlog']).toBe(1)
         expect(stats['in-progress']).toBe(1)
+        db.close()
+    })
+})
+
+describe('check.run events', () => {
+    function makeCheck(overrides: Partial<CheckRunEvent> = {}): CheckRunEvent {
+        return {
+            id: `chk-${Math.random().toString(36).slice(2, 8)}`,
+            type: 'check.run',
+            timestamp: new Date().toISOString(),
+            actor: 'test@example.com',
+            taskId: 'TASK-001',
+            command: 'pnpm test',
+            exitCode: 0,
+            passed: true,
+            ...overrides,
+        }
+    }
+
+    it('creates a checks table on rebuild', () => {
+        rebuild(TEST_ROOT, [])
+        const db = openDb(TEST_ROOT)
+
+        const tables = db
+            .prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
+            .all() as Array<{ name: string }>
+
+        expect(tables.map((t) => t.name)).toContain('checks')
+        db.close()
+    })
+
+    it('stores a recorded check for the task', () => {
+        const events: AipimEvent[] = [makeTask(), makeCheck({ id: 'c1', command: 'pnpm lint' })]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks).toHaveLength(1)
+        expect(checks[0].command).toBe('pnpm lint')
+        expect(checks[0].passed).toBe(true)
+        db.close()
+    })
+
+    it('stores a failed check with passed false', () => {
+        const events: AipimEvent[] = [makeTask(), makeCheck({ id: 'c1', exitCode: 1, passed: false })]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks[0].passed).toBe(false)
+        expect(checks[0].exit_code).toBe(1)
+        db.close()
+    })
+
+    it('returns checks ordered oldest first', () => {
+        const events: AipimEvent[] = [
+            makeTask(),
+            makeCheck({ id: 'c2', timestamp: '2026-01-02T00:00:00.000Z', command: 'second' }),
+            makeCheck({ id: 'c1', timestamp: '2026-01-01T00:00:00.000Z', command: 'first' }),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks.map((c) => c.command)).toEqual(['first', 'second'])
+        db.close()
+    })
+
+    it('does not return checks belonging to another task', () => {
+        const events: AipimEvent[] = [
+            makeTask(),
+            makeTask({ taskId: 'TASK-002', id: 'e2' }),
+            makeCheck({ id: 'c1', taskId: 'TASK-002' }),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        expect(getChecksForTask(db, 'TASK-001')).toHaveLength(0)
+        db.close()
+    })
+})
+
+describe('task dependency events', () => {
+    function makeDepAdded(taskId: string, dependsOn: string, id = `d-${Math.random().toString(36).slice(2, 8)}`): TaskDependencyAddedEvent {
+        return {
+            id,
+            type: 'task.dependency_added',
+            timestamp: new Date().toISOString(),
+            actor: 'test@example.com',
+            taskId,
+            dependsOn,
+        }
+    }
+
+    function makeDepRemoved(taskId: string, dependsOn: string): TaskDependencyRemovedEvent {
+        return {
+            id: `dr-${Math.random().toString(36).slice(2, 8)}`,
+            type: 'task.dependency_removed',
+            timestamp: new Date().toISOString(),
+            actor: 'test@example.com',
+            taskId,
+            dependsOn,
+        }
+    }
+
+    it('creates a task_dependencies table on rebuild', () => {
+        rebuild(TEST_ROOT, [])
+        const db = openDb(TEST_ROOT)
+
+        const tables = db
+            .prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
+            .all() as Array<{ name: string }>
+
+        expect(tables.map((t) => t.name)).toContain('task_dependencies')
+        db.close()
+    })
+
+    it('records an edge from task.dependency_added', () => {
+        const events: AipimEvent[] = [
+            makeTask({ taskId: 'TASK-001', id: 'e1' }),
+            makeTask({ taskId: 'TASK-002', id: 'e2' }),
+            makeDepAdded('TASK-002', 'TASK-001'),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        expect(getDependencies(db, 'TASK-002')).toEqual(['TASK-001'])
+        db.close()
+    })
+
+    it('drops the edge on task.dependency_removed', () => {
+        const events: AipimEvent[] = [
+            makeTask({ taskId: 'TASK-001', id: 'e1' }),
+            makeTask({ taskId: 'TASK-002', id: 'e2' }),
+            makeDepAdded('TASK-002', 'TASK-001'),
+            makeDepRemoved('TASK-002', 'TASK-001'),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        expect(getDependencies(db, 'TASK-002')).toEqual([])
+        db.close()
+    })
+
+    it('does not duplicate an edge added twice', () => {
+        const events: AipimEvent[] = [
+            makeTask({ taskId: 'TASK-001', id: 'e1' }),
+            makeTask({ taskId: 'TASK-002', id: 'e2' }),
+            makeDepAdded('TASK-002', 'TASK-001', 'd1'),
+            makeDepAdded('TASK-002', 'TASK-001', 'd2'),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        expect(getDependencies(db, 'TASK-002')).toEqual(['TASK-001'])
+        db.close()
+    })
+
+    it('returns the tasks that depend on a given task', () => {
+        const events: AipimEvent[] = [
+            makeTask({ taskId: 'TASK-001', id: 'e1' }),
+            makeTask({ taskId: 'TASK-002', id: 'e2' }),
+            makeTask({ taskId: 'TASK-003', id: 'e3' }),
+            makeDepAdded('TASK-002', 'TASK-001'),
+            makeDepAdded('TASK-003', 'TASK-001'),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        expect(getDependents(db, 'TASK-001').sort()).toEqual(['TASK-002', 'TASK-003'])
+        db.close()
+    })
+
+    it('returns every edge in the project', () => {
+        const events: AipimEvent[] = [
+            makeTask({ taskId: 'TASK-001', id: 'e1' }),
+            makeTask({ taskId: 'TASK-002', id: 'e2' }),
+            makeDepAdded('TASK-002', 'TASK-001'),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        expect(getAllDependencies(db)).toEqual([{ taskId: 'TASK-002', dependsOn: 'TASK-001' }])
         db.close()
     })
 })

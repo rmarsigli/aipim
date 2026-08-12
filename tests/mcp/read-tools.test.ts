@@ -4,7 +4,7 @@ import { join } from 'path'
 import { openDb, rebuild, applyEvent } from '../../src/core/db.js'
 import { readTools } from '../../src/mcp/tools/read.js'
 import type { ToolContext } from '../../src/mcp/tools/index.js'
-import type { AipimEvent, TaskCreatedEvent, TaskStatusChangedEvent, TaskCommentAddedEvent } from '../../src/types/index.js'
+import type { AipimEvent, TaskCreatedEvent, TaskStatusChangedEvent, TaskCommentAddedEvent, TaskDependencyAddedEvent } from '../../src/types/index.js'
 import Database from 'better-sqlite3'
 
 const TEST_ROOT = join(process.cwd(), 'tests/__fixtures__/read-tools-test')
@@ -47,13 +47,9 @@ let ctx: ToolContext
 
 beforeEach(() => {
     mkdirSync(join(TEST_ROOT, '.project'), { recursive: true })
+    // Use the real schema so these tests never drift from src/core/db.ts
+    rebuild(TEST_ROOT, [])
     db = openDb(TEST_ROOT)
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, title TEXT NOT NULL, task_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'backlog', priority TEXT NOT NULL, assignee TEXT, file_path TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, actor TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS decisions (id TEXT PRIMARY KEY, title TEXT NOT NULL, rationale TEXT NOT NULL, task_id TEXT, file_path TEXT, actor TEXT NOT NULL, created_at TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS events_log (id TEXT PRIMARY KEY, type TEXT NOT NULL, payload TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL);
-    `)
     ctx = { db, projectRoot: TEST_ROOT, events: [] }
 })
 
@@ -240,5 +236,101 @@ describe('get_blockers', () => {
         expect(result[0].id).toBe('TASK-001')
         expect(typeof result[0].blockedForDays).toBe('number')
         expect(result[0].blockedForDays).toBeGreaterThanOrEqual(0)
+    })
+})
+
+function makeDep(taskId: string, dependsOn: string): TaskDependencyAddedEvent {
+    return {
+        id: `dep-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'task.dependency_added',
+        timestamp: new Date().toISOString(),
+        actor: 'test@example.com',
+        taskId,
+        dependsOn,
+    }
+}
+
+describe('get_task_graph', () => {
+    const tool = makeTool('get_task_graph')
+
+    it('returns an empty graph for a project with no tasks', () => {
+        rebuild(TEST_ROOT, [])
+        const result = tool.handler(ctx, {}) as Record<string, unknown>
+
+        expect(result.nodes).toEqual([])
+        expect(result.ready).toEqual([])
+    })
+
+    it('returns the ready frontier and the blocked set', () => {
+        const events: AipimEvent[] = [
+            baseEvent({ taskId: 'TASK-001', id: 'e1' }),
+            baseEvent({ taskId: 'TASK-002', id: 'e2' }),
+            makeDep('TASK-002', 'TASK-001'),
+        ]
+        rebuild(TEST_ROOT, events)
+
+        const result = tool.handler(ctx, {}) as Record<string, unknown>
+
+        expect(result.ready).toEqual(['TASK-001'])
+        expect(result.blocked).toEqual(['TASK-002'])
+    })
+
+    it('reports cycles so a broken graph is visible', () => {
+        const events: AipimEvent[] = [
+            baseEvent({ taskId: 'TASK-001', id: 'e1' }),
+            baseEvent({ taskId: 'TASK-002', id: 'e2' }),
+            makeDep('TASK-001', 'TASK-002'),
+            makeDep('TASK-002', 'TASK-001'),
+        ]
+        rebuild(TEST_ROOT, events)
+
+        const result = tool.handler(ctx, {}) as Record<string, unknown>
+
+        expect(result.cycles).toEqual([['TASK-001', 'TASK-002']])
+    })
+})
+
+describe('get_next_task with dependencies', () => {
+    const tool = makeTool('get_next_task')
+
+    it('skips a higher-priority task that is still blocked', () => {
+        const events: AipimEvent[] = [
+            baseEvent({ taskId: 'TASK-001', id: 'e1', priority: 'P2-M' }),
+            baseEvent({ taskId: 'TASK-002', id: 'e2', priority: 'P1-S' }),
+            makeDep('TASK-002', 'TASK-003'),
+            baseEvent({ taskId: 'TASK-003', id: 'e3', priority: 'P3' }),
+        ]
+        rebuild(TEST_ROOT, events)
+
+        const result = tool.handler(ctx, {}) as Record<string, unknown>
+
+        expect(result.id).toBe('TASK-001')
+    })
+
+    it('returns the blocked task once its dependency is done', () => {
+        const events: AipimEvent[] = [
+            baseEvent({ taskId: 'TASK-002', id: 'e2', priority: 'P1-S' }),
+            baseEvent({ taskId: 'TASK-003', id: 'e3', priority: 'P3' }),
+            makeDep('TASK-002', 'TASK-003'),
+            makeStatusChange('TASK-003', 'done'),
+        ]
+        rebuild(TEST_ROOT, events)
+
+        const result = tool.handler(ctx, {}) as Record<string, unknown>
+
+        expect(result.id).toBe('TASK-002')
+    })
+
+    it('reports that everything left is blocked when nothing is ready', () => {
+        const events: AipimEvent[] = [
+            baseEvent({ taskId: 'TASK-001', id: 'e1' }),
+            makeDep('TASK-001', 'TASK-999'),
+        ]
+        rebuild(TEST_ROOT, events)
+
+        const result = tool.handler(ctx, {}) as Record<string, unknown>
+
+        expect(result.blockedTasks).toEqual(['TASK-001'])
+        expect(typeof result.message).toBe('string')
     })
 })

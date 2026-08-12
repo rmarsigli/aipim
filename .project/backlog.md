@@ -1,56 +1,65 @@
 # Backlog
 
-> AIPIM 2.0 — Refatoração completa: JSONL + SQLite + MCP + Svelte UI
+> AIPIM 2.3 — o event log como mecanismo de controle, não só como registro.
 
 ## Roadmap
 
-**MVP (2.0)** — Tasks 001–007: core da nova arquitetura
-**Fase 2** — Tasks 008–009: suporte a times
-**Fase 3** — Tasks 010–015: UI e infraestrutura final
+**2.0** — Tasks 001–015: reescrita event-sourced (JSONL + SQLite + MCP + Svelte UI) — ✅
+**2.1** — Laravel Boost — ✅
+**2.2** — Skills como módulos de contexto + Active Skills (MCP) — ✅
+**2.3** — Loop & graph: gate de verificação, grafo de dependências, hooks — ✅
+
+### Entregue em 2.3
+
+| Peça | Descrição |
+|---|---|
+| Gate de verificação | `check.run` events, `verify_task`, `complete_task` recusado sem evidência verde |
+| Grafo de dependências | tabela `task_dependencies`, `add_dependency`/`remove_dependency`/`get_task_graph`, fronteira pronta em `get_next_task`, ciclos rejeitados |
+| Hooks | `SessionStart` injeta estado, `Stop` checa trabalho não verificado, `aipim hook install` |
+| CLI unificado | `aipim task next` derivado do event log, compartilhando `getNextReadyTask` com o MCP (TASK-032) |
 
 ---
 
 ## Tasks
 
-| ID | Type | Task | Status | Priority |
-|---|---|---|---|---|
-| TASK-001 | feat | Implement JSONL event system | backlog | P1-M |
-| TASK-002 | feat | Implement SQLite derived state layer | backlog | P1-L |
-| TASK-003 | feat | Migration script: existing .md files → events.jsonl | backlog | P1-M |
-| TASK-004 | feat | MCP server — Hono + aipim mcp start | backlog | P1-M |
-| TASK-005 | feat | MCP read tools (get_project_context, get_next_task, list_tasks, get_task, get_blockers) | backlog | P1-M |
-| TASK-006 | feat | MCP write tools (complete_task, update_status, add_comment, log_decision, create_task) | backlog | P1-M |
-| TASK-007 | fix  | Fix task next — priority ordering instead of alphabetical | backlog | P1-S |
-| TASK-008 | feat | Team configuration — config.toml + identity resolution | backlog | P2-M |
-| TASK-009 | feat | Git union merge driver for events.jsonl | backlog | P2-S |
-| TASK-010 | feat | REST API — /api/* endpoints on Hono for Svelte UI | backlog | P2-M |
-| TASK-011 | feat | Svelte UI — project setup, Vite build, static serving | backlog | P2-M |
-| TASK-012 | feat | Svelte UI — Kanban board with drag-and-drop | backlog | P2-L |
-| TASK-013 | feat | Svelte UI — Task detail panel with inline markdown editing | backlog | P2-L |
-| TASK-014 | feat | Svelte UI — Event timeline view | backlog | P2-M |
-| TASK-015 | refactor | Monorepo split — pnpm workspaces (@aipim/core, @aipim/mcp, @aipim/ui) | backlog | P3 |
+| ID | Type | Task | Status | Priority | Est. |
+|---|---|---|---|---|---|
+| TASK-033 | feat | View de grafo de dependências na UI | backlog | P2-M | 6h |
+| TASK-034 | feat | Evidência de verificação na timeline e no detalhe da task | backlog | P2-M | 4h |
+| TASK-035 | feat | Métricas derivadas do event log (`get_metrics`) | backlog | P2-M | 6h |
+| TASK-036 | docs | Enxugar CLAUDE.md para o que o harness não impõe | blocked | P2-S | 3h |
+| TASK-037 | feat | Grafo de proveniência: ADR ↔ task ↔ arquivo ↔ commit | backlog | P3 | 10h |
+| TASK-015 | docs | Improve Documentation Structure | blocked | P2-M | — |
 
 ---
 
 ## Dependências
 
 ```
-TASK-001 (events)
-  └── TASK-002 (SQLite)
-        └── TASK-003 (migration)
-              └── TASK-004 (MCP server)
-                    ├── TASK-005 (MCP read tools)
-                    │     └── TASK-006 (MCP write tools)
-                    └── TASK-008 (team config)
-                          └── TASK-009 (union merge)
+TASK-035 (métricas)
+  └── TASK-036 (enxugar CLAUDE.md — precisa do get_metrics para substituir a seção de métricas)
 
-TASK-002 ──── TASK-007 (fix priority ordering)
-
-TASK-004 + TASK-005 + TASK-006
-  └── TASK-010 (REST API)
-        └── TASK-011 (Svelte setup)
-              ├── TASK-012 (Kanban)
-              ├── TASK-013 (Task detail)
-              └── TASK-014 (Timeline)
-                    └── TASK-015 (Monorepo — só quando necessário)
+TASK-033, TASK-034, TASK-037 — independentes, podem ir em paralelo
 ```
+
+Fonte de verdade: `events.jsonl`. Rode `aipim deps` para o grafo atual.
+
+---
+
+## Contexto da fase 2.3
+
+A revisão que originou estas tasks partiu de duas ideias que ganharam nome em 2026:
+
+- **Loop engineering** — o loop de um agente (gather → act → **verify** → repeat) pertence ao
+  harness, não ao prompt. O AIPIM já era o harness; só não exercia o papel. O gate de
+  verificação é o ponto de estrangulamento onde isso passa a valer.
+- **Graph engineering** — modelar execução como grafo: o que pode rodar agora, o que espera o
+  quê. Sem grafo não dá para saber o que é paralelizável nem para despachar subagentes com
+  segurança.
+
+Decisão explícita de escopo: **o AIPIM não vira LangGraph**. Ele não orquestra o loop do
+agente; é a memória persistente e a camada de governança em volta de qualquer loop.
+
+Da mesma forma, não vamos indexar estrutura de código (call graph, símbolos) — essa categoria
+já é disputada. O diferencial do AIPIM é intenção e proveniência: *por que* o código está
+assim, qual decisão o governa. É o que TASK-037 ataca.

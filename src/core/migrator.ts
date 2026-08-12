@@ -25,6 +25,10 @@ export async function migrate(projectRoot: string): Promise<MigrationResult> {
 
     let tasksFound = 0
     let eventsGenerated = 0
+    // Collected during the file pass, emitted afterwards so every referenced
+    // task already exists as an event before its edges are written.
+    const declaredDependencies: Array<{ taskId: string; dependsOn: string }> = []
+    const migratedIds = new Set<string>()
 
     // Migrate backlog/
     const backlogDir = join(projectRoot, '.project/backlog')
@@ -38,6 +42,7 @@ export async function migrate(projectRoot: string): Promise<MigrationResult> {
             const { data: fm } = matter(content)
 
             tasksFound++
+            migratedIds.add(taskId)
             await appendEvent(projectRoot, {
                 type: 'task.created',
                 taskId,
@@ -47,6 +52,10 @@ export async function migrate(projectRoot: string): Promise<MigrationResult> {
                 filePath: `.project/backlog/${file}`
             })
             eventsGenerated++
+
+            for (const dependsOn of normaliseDependsOn(fm.depends_on)) {
+                declaredDependencies.push({ taskId, dependsOn })
+            }
 
             if (fm.assignee) {
                 await appendEvent(projectRoot, {
@@ -71,6 +80,7 @@ export async function migrate(projectRoot: string): Promise<MigrationResult> {
             const { data: fm } = matter(content)
 
             tasksFound++
+            migratedIds.add(taskId)
             await appendEvent(projectRoot, {
                 type: 'task.created',
                 taskId,
@@ -91,10 +101,30 @@ export async function migrate(projectRoot: string): Promise<MigrationResult> {
         }
     }
 
+    // Dependencies last: an edge to a task that was never migrated is dropped
+    // rather than recorded as a permanently unsatisfiable blocker.
+    for (const { taskId, dependsOn } of declaredDependencies) {
+        if (!migratedIds.has(dependsOn) || taskId === dependsOn) continue
+        await appendEvent(projectRoot, { type: 'task.dependency_added', taskId, dependsOn })
+        eventsGenerated++
+    }
+
     // Rebuild SQLite from the generated events
     rebuild(projectRoot, readEvents(projectRoot))
 
     return { tasksFound, eventsGenerated, skipped: 0 }
+}
+
+/**
+ * Normalises a 1.x `depends_on` frontmatter value into canonical task IDs.
+ * Accepts both `TASK-001` and the short `T001` form used by early projects.
+ */
+function normaliseDependsOn(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+    return value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => extractTaskId(entry))
+        .filter((id): id is string => id !== null)
 }
 
 /**

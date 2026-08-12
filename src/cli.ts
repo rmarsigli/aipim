@@ -133,6 +133,7 @@ import { registerMigrateCommand } from './commands/migrate.js'
 import { registerMcpCommand } from './commands/mcp.js'
 import { registerTeamCommand } from './commands/team.js'
 import { registerUiCommand } from './commands/ui.js'
+import { registerHookCommand } from './commands/hook.js'
 
 program
     .command('completion')
@@ -146,6 +147,7 @@ registerMigrateCommand(program)
 registerMcpCommand(program)
 registerTeamCommand(program)
 registerUiCommand(program)
+registerHookCommand(program)
 
 if (!process.argv.slice(2).length) {
     program.outputHelp()

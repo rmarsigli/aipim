@@ -8,7 +8,10 @@ import {
     TaskPriorityChangedEvent,
     TaskCommentAddedEvent,
     TaskCompletedEvent,
-    DecisionLoggedEvent
+    DecisionLoggedEvent,
+    CheckRunEvent,
+    TaskDependencyAddedEvent,
+    TaskDependencyRemovedEvent
 } from '../types/index.js'
 
 const DB_FILE = '.project/data.db'
@@ -61,6 +64,25 @@ CREATE TABLE IF NOT EXISTS decisions (
     created_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS task_dependencies (
+    task_id     TEXT NOT NULL,
+    depends_on  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (task_id, depends_on)
+);
+
+CREATE TABLE IF NOT EXISTS checks (
+    id          TEXT PRIMARY KEY,
+    task_id     TEXT NOT NULL,
+    command     TEXT NOT NULL,
+    exit_code   INTEGER NOT NULL,
+    passed      INTEGER NOT NULL,
+    duration_ms INTEGER,
+    output      TEXT,
+    actor       TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS events_log (
     id          TEXT PRIMARY KEY,
     type        TEXT NOT NULL,
@@ -72,6 +94,8 @@ CREATE TABLE IF NOT EXISTS events_log (
 CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
+CREATE INDEX IF NOT EXISTS idx_checks_task    ON checks(task_id);
+CREATE INDEX IF NOT EXISTS idx_deps_depends_on ON task_dependencies(depends_on);
 `
 
 export function openDb(projectRoot: string): Database.Database {
@@ -88,6 +112,8 @@ export function rebuild(projectRoot: string, events: AipimEvent[]): void {
     const db = openDb(projectRoot)
 
     db.exec('DROP TABLE IF EXISTS events_log')
+    db.exec('DROP TABLE IF EXISTS checks')
+    db.exec('DROP TABLE IF EXISTS task_dependencies')
     db.exec('DROP TABLE IF EXISTS comments')
     db.exec('DROP TABLE IF EXISTS decisions')
     db.exec('DROP TABLE IF EXISTS tasks')
@@ -160,6 +186,35 @@ function handleDecisionLogged(db: Database.Database, event: DecisionLoggedEvent)
     )
 }
 
+function handleCheckRun(db: Database.Database, event: CheckRunEvent): void {
+    db.prepare(
+        `INSERT OR IGNORE INTO checks (id, task_id, command, exit_code, passed, duration_ms, output, actor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+        event.id,
+        event.taskId,
+        event.command,
+        event.exitCode,
+        event.passed ? 1 : 0,
+        event.durationMs ?? null,
+        event.output ?? null,
+        event.actor,
+        event.timestamp
+    )
+}
+
+function handleTaskDependencyAdded(db: Database.Database, event: TaskDependencyAddedEvent): void {
+    db.prepare(`INSERT OR IGNORE INTO task_dependencies (task_id, depends_on, created_at) VALUES (?, ?, ?)`).run(
+        event.taskId,
+        event.dependsOn,
+        event.timestamp
+    )
+}
+
+function handleTaskDependencyRemoved(db: Database.Database, event: TaskDependencyRemovedEvent): void {
+    db.prepare(`DELETE FROM task_dependencies WHERE task_id = ? AND depends_on = ?`).run(event.taskId, event.dependsOn)
+}
+
 /**
  * Applies a single event to an already-open database.
  * Used both during rebuild and for incremental updates (append → applyEvent).
@@ -186,6 +241,12 @@ export function applyEvent(db: Database.Database, event: AipimEvent): void {
             return handleTaskCompleted(db, event)
         case 'decision.logged':
             return handleDecisionLogged(db, event)
+        case 'check.run':
+            return handleCheckRun(db, event)
+        case 'task.dependency_added':
+            return handleTaskDependencyAdded(db, event)
+        case 'task.dependency_removed':
+            return handleTaskDependencyRemoved(db, event)
         // Events that don't mutate derived state (content_updated, dependency_*, session_*)
         default:
             break
@@ -269,6 +330,64 @@ export function getBlockers(db: Database.Database): TaskRow[] {
 
 export function getCommentsForTask(db: Database.Database, taskId: string): CommentRow[] {
     return db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at ASC').all(taskId) as CommentRow[]
+}
+
+export interface CheckRow {
+    id: string
+    task_id: string
+    command: string
+    exit_code: number
+    passed: boolean
+    duration_ms: number | null
+    output: string | null
+    actor: string
+    created_at: string
+}
+
+/**
+ * Returns all recorded checks for a task, oldest first.
+ * SQLite has no boolean type, so `passed` is normalised back to a real boolean here.
+ */
+export function getChecksForTask(db: Database.Database, taskId: string): CheckRow[] {
+    const rows = db.prepare('SELECT * FROM checks WHERE task_id = ? ORDER BY created_at ASC').all(taskId) as Array<
+        Omit<CheckRow, 'passed'> & { passed: number }
+    >
+    return rows.map((row) => ({ ...row, passed: row.passed === 1 }))
+}
+
+export interface DependencyEdge {
+    taskId: string
+    dependsOn: string
+}
+
+/**
+ * Returns the IDs of the tasks a given task depends on.
+ */
+export function getDependencies(db: Database.Database, taskId: string): string[] {
+    const rows = db
+        .prepare('SELECT depends_on FROM task_dependencies WHERE task_id = ? ORDER BY depends_on ASC')
+        .all(taskId) as Array<{ depends_on: string }>
+    return rows.map((r) => r.depends_on)
+}
+
+/**
+ * Returns the IDs of the tasks blocked by a given task — the reverse edge.
+ */
+export function getDependents(db: Database.Database, taskId: string): string[] {
+    const rows = db
+        .prepare('SELECT task_id FROM task_dependencies WHERE depends_on = ? ORDER BY task_id ASC')
+        .all(taskId) as Array<{ task_id: string }>
+    return rows.map((r) => r.task_id)
+}
+
+/**
+ * Returns every dependency edge in the project.
+ */
+export function getAllDependencies(db: Database.Database): DependencyEdge[] {
+    const rows = db
+        .prepare('SELECT task_id, depends_on FROM task_dependencies ORDER BY task_id ASC, depends_on ASC')
+        .all() as Array<{ task_id: string; depends_on: string }>
+    return rows.map((r) => ({ taskId: r.task_id, dependsOn: r.depends_on }))
 }
 
 export function getDecisions(db: Database.Database): DecisionRow[] {

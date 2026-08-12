@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-08-12
+
+The event log stops being only a record and starts being the mechanism that enforces the process. See `.project/decisions/2026-08-12-ADR010-loop-and-graph-engineering.md`.
+
+### Added
+
+**Verification gate (`src/core/verification.ts`)**
+- New `check.run` event type: command, exit code, pass/fail, duration and truncated output tail.
+- `[checks] commands` in `config.toml` declares what must pass before a task can be completed.
+- `verify_task` MCP tool runs the configured commands and records one event per command.
+- `complete_task` is rejected unless every required command has a passing run *after the task's last non-check event*. Stale evidence does not count.
+- `complete_task` accepts `force: true`, which completes the task and records `checksBypassed: true` — the bypass is auditable, not invisible.
+- With no `[checks]` configured the gate is a no-op; existing projects are unaffected.
+- `checks` table in the read model, plus `getChecksForTask()`.
+- `McpTool.timeoutMs` lets a tool override the server's 30s default (`verify_task` uses 300s).
+
+**Task graph (`src/core/graph.ts`)**
+- `task_dependencies` table fed by `task.dependency_added` / `task.dependency_removed`, which `applyEvent` previously dropped.
+- `buildTaskGraph()` derives forward and reverse edges, blocking dependencies, the ready frontier, the blocked set and cycles.
+- `get_next_task` now returns from the ready frontier — a blocked task is never handed out. When nothing is ready it reports what is blocking.
+- `get_task_graph` MCP tool and `GET /api/graph` REST endpoint.
+- `add_dependency` / `remove_dependency` MCP tools. Cycles rejected at write time by reachability check.
+- A dependency on a task that does not exist counts as blocking.
+- `get_project_context` now includes the ready frontier, blocked set, cycles and required checks.
+- `aipim deps` rewritten over the event-sourced graph.
+- Migrator converts legacy `depends_on:` frontmatter into dependency events, including the short `T001` form, dropping edges to tasks that were never migrated.
+
+**Claude Code hooks (`src/core/hooks.ts`)**
+- `SessionStart` hook injects current project state so no session starts blind.
+- `Stop` hook checks that in-progress work has been verified; blocking is opt-in via `[hooks] block_on_unverified`.
+- `aipim hook install` registers them; `aipim install` does it automatically for `claude-code`.
+- Merging preserves user-authored hooks and replaces only AIPIM's own entries (tagged `aipim-managed`) — repeated installs are idempotent.
+- A `settings.json` that cannot be parsed is left untouched rather than overwritten.
+
+### Fixed
+
+- `aipim task next` resolved the next task by parsing `.project/backlog/*.md` frontmatter, which meant the CLI and the MCP `get_next_task` tool could disagree — the CLI happily returned a task blocked by unfinished work. Both now share `getNextReadyTask` over the event log. The command also reports how many tasks are ready, how many are blocked, and any cycles.
+- `complete_task` stacked a second date on the archived filename when the backlog file already carried one (`completed/2026-08-12-2026-08-12-TASK-001-name.md`). The existing date is now replaced, so archived files stay dated by completion.
+
+### Removed
+
+- `src/utils/dependencies.ts` — the 1.x markdown-based graph, which used a hand-rolled frontmatter parser and fuzzy ID matching (`key.includes(id)` matched `TASK-1` against `TASK-10`). Replaced by `core/graph.ts`.
+- `resolveNextTask(files, backlogDir)` markdown parsing in `src/commands/task.ts`, replaced by an event-sourced `resolveNextTask(projectRoot)`.
+
+### Changed
+
+- `tests/mcp/read-tools.test.ts` and `tests/mcp/write-tools.test.ts` now build their fixtures with the real `rebuild()` schema instead of duplicating DDL, so they cannot drift from `core/db.ts`.
+- Test suite: 260 → 353 tests.
+
+## [2.2.0] - 2026-03-20
+
+Released on GitHub as "Skills System" but never recorded here — reconstructed from the release notes and the commits between `v2.1.0` and `v2.2.0`.
+
+### Added
+
+**Context modules (`src/core/skills.ts`)**
+- `aipim add skill <name>` injects technology-specific guidelines into `CLAUDE.md` / `GEMINI.md`, or into `.ai/guidelines/skill-<name>.blade.php` for Laravel Boost projects. Idempotent.
+- `aipim list skills` lists what is available.
+- 19 built-in skills: `tailwind`, `typescript`, `pest`, `vitest`, `react`, `vue`, `svelte`, `laravel`, `php`, `python`, `rust`, `django`, `fastapi`, `langchain`, `nextjs`, `prisma`, `docker`, `rest-api`, `security`.
+
+**Active skills (`src/mcp/skills/`)**
+- Skills can expose extra MCP tools, enabled per project via `active_skills` in `config.toml` and merged into the toolset at runtime — no server restart.
+- First active skill: `database`, adding `aipim_db_schema` and `aipim_db_query` for read-only access to local SQLite files. Writes are blocked at the driver level.
+
+### Fixed
+
+- Path traversal in `PUT /api/tasks/:id/content` and in `log_decision`.
+- `appendEvent()` is async with a per-project write lock, preventing interleaved writes under concurrent tool calls.
+- `POST /api/events` validates `type` against a whitelist of known event types.
+- 30s timeout on MCP tool handlers so a hung tool cannot hang the server.
+
+### Performance
+
+- `readEvents()` caches by file mtime, avoiding a re-read and re-parse of `events.jsonl` on every MCP request.
+
 ## [2.1.0] - 2026-03-19
 
 ### Added

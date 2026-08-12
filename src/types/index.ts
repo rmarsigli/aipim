@@ -69,6 +69,7 @@ export type EventType =
     | 'task.dependency_removed'
     | 'task.completed'
     | 'decision.logged'
+    | 'check.run'
     | 'session.started'
     | 'session.ended'
 
@@ -83,6 +84,7 @@ export const EVENT_TYPES: EventType[] = [
     'task.dependency_removed',
     'task.completed',
     'decision.logged',
+    'check.run',
     'session.started',
     'session.ended'
 ]
@@ -128,6 +130,23 @@ export interface TaskCompletedEvent extends BaseEvent {
     taskId: string
     notes?: string
     actualHours?: number
+    /** True when the verification gate was explicitly bypassed. Kept for auditability. */
+    checksBypassed?: boolean
+}
+
+/**
+ * Evidence that a verification command ran against a task.
+ * This is what turns "done" from a claim into a verifiable fact.
+ */
+export interface CheckRunEvent extends BaseEvent {
+    type: 'check.run'
+    taskId: string
+    command: string
+    exitCode: number
+    passed: boolean
+    durationMs?: number
+    /** Tail of the command output, truncated — enough to diagnose without bloating the log. */
+    output?: string
 }
 
 export interface TaskContentUpdatedEvent extends BaseEvent {
@@ -185,5 +204,6 @@ export type AipimEvent =
     | TaskDependencyAddedEvent
     | TaskDependencyRemovedEvent
     | DecisionLoggedEvent
+    | CheckRunEvent
     | SessionStartedEvent
     | SessionEndedEvent
