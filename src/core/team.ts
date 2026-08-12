@@ -16,6 +16,8 @@ export interface ProjectConfig {
     team: TeamMember[]
     /** Commands that must pass before a task can be completed. See core/verification.ts. */
     checks?: { commands?: unknown[] }
+    /** Claude Code hook behaviour. See core/hooks.ts. */
+    hooks?: { block_on_unverified?: boolean }
 }
 
 export function loadConfig(projectRoot: string): ProjectConfig | null {

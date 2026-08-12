@@ -7,6 +7,7 @@ import { logger } from '@/utils/logger.js'
 import { signatureManager } from '@/core/signature.js'
 import { fileURLToPath } from 'url'
 import { validatePath } from '@/utils/path-validator.js'
+import { installHooks } from '@/core/hooks.js'
 
 const GITATTRIBUTES_MARKER = 'events.jsonl merge=union'
 const GITATTRIBUTES_BLOCK = `\n# AIPIM: prevent merge conflicts in the append-only event log.\n# The union driver keeps all lines from both sides — always correct for append-only logs.\n.project/events.jsonl merge=union\n`
@@ -60,6 +61,11 @@ export async function installProject(config: InstallConfig, _detected: DetectedP
 
     logger.debug('Making scripts executable...')
     await makeScriptsExecutable(config.dryRun)
+
+    if (config.ais.includes('claude-code')) {
+        logger.debug('Registering Claude Code hooks...')
+        setupClaudeHooks(process.cwd(), config.dryRun)
+    }
 
     if (config.dryRun) {
         logger.success('Dry run completed successfully')
@@ -171,6 +177,29 @@ async function generateCursorRules(config: InstallConfig, templatesDir: string):
     } else {
         const safePath = validatePath('.cursorrules')
         await fs.writeFile(safePath, signedRules, 'utf-8')
+    }
+}
+
+/**
+ * Registers AIPIM's Claude Code hooks, turning the session protocol into
+ * something the harness runs instead of something the model must remember.
+ *
+ * A failure here is not fatal — the project still works without hooks.
+ */
+export function setupClaudeHooks(projectRoot: string, dryRun?: boolean): void {
+    if (dryRun) {
+        logger.info('[dry-run] Would register Claude Code hooks in .claude/settings.json')
+        return
+    }
+
+    try {
+        const written = installHooks(projectRoot)
+        logger.debug(`Claude Code hooks registered in ${written}`)
+    } catch (error) {
+        logger.warn(
+            `Could not register Claude Code hooks: ${error instanceof Error ? error.message : String(error)}. ` +
+                'Run `aipim hook install` after fixing it.'
+        )
     }
 }
 
