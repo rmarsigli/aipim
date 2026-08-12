@@ -11,7 +11,9 @@ import {
     DecisionLoggedEvent,
     CheckRunEvent,
     TaskDependencyAddedEvent,
-    TaskDependencyRemovedEvent
+    TaskDependencyRemovedEvent,
+    DiscoveryStartedEvent,
+    DiscoveryStateUpdatedEvent
 } from '../types/index.js'
 
 const DB_FILE = '.project/data.db'
@@ -83,6 +85,24 @@ CREATE TABLE IF NOT EXISTS checks (
     created_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS discovery_sessions (
+    id          TEXT PRIMARY KEY,
+    topic       TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'open',
+    started_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    actor       TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS discovery_states (
+    id          TEXT PRIMARY KEY,
+    session_id  TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    state       TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    UNIQUE (session_id, version)
+);
+
 CREATE TABLE IF NOT EXISTS events_log (
     id          TEXT PRIMARY KEY,
     type        TEXT NOT NULL,
@@ -96,6 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
 CREATE INDEX IF NOT EXISTS idx_checks_task    ON checks(task_id);
 CREATE INDEX IF NOT EXISTS idx_deps_depends_on ON task_dependencies(depends_on);
+CREATE INDEX IF NOT EXISTS idx_discovery_states_session ON discovery_states(session_id);
 `
 
 /**
@@ -142,6 +163,8 @@ export function rebuild(projectRoot: string, events: AipimEvent[]): void {
     const db = openDb(projectRoot)
 
     db.exec('DROP TABLE IF EXISTS events_log')
+    db.exec('DROP TABLE IF EXISTS discovery_states')
+    db.exec('DROP TABLE IF EXISTS discovery_sessions')
     db.exec('DROP TABLE IF EXISTS checks')
     db.exec('DROP TABLE IF EXISTS task_dependencies')
     db.exec('DROP TABLE IF EXISTS comments')
@@ -245,6 +268,34 @@ function handleTaskDependencyRemoved(db: Database.Database, event: TaskDependenc
     db.prepare(`DELETE FROM task_dependencies WHERE task_id = ? AND depends_on = ?`).run(event.taskId, event.dependsOn)
 }
 
+function handleDiscoveryStarted(db: Database.Database, event: DiscoveryStartedEvent): void {
+    db.prepare(
+        `INSERT OR IGNORE INTO discovery_sessions (id, topic, status, started_at, updated_at, actor)
+         VALUES (?, ?, 'open', ?, ?, ?)`
+    ).run(event.sessionId, event.topic, event.timestamp, event.timestamp, event.actor)
+}
+
+/**
+ * Records a distilled-state snapshot as the next version of its session.
+ *
+ * The version is derived at apply time rather than carried on the event, so it
+ * stays correct when the read model is rebuilt from the log. Keying the row on
+ * the event id (rather than on session+version) is what keeps re-applying the
+ * same event a no-op instead of appending a duplicate version.
+ */
+function handleDiscoveryStateUpdated(db: Database.Database, event: DiscoveryStateUpdatedEvent): void {
+    const row = db
+        .prepare('SELECT MAX(version) AS version FROM discovery_states WHERE session_id = ?')
+        .get(event.sessionId) as { version: number | null } | undefined
+
+    db.prepare(
+        `INSERT OR IGNORE INTO discovery_states (id, session_id, version, state, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+    ).run(event.id, event.sessionId, (row?.version ?? 0) + 1, JSON.stringify(event.state), event.timestamp)
+
+    db.prepare('UPDATE discovery_sessions SET updated_at = ? WHERE id = ?').run(event.timestamp, event.sessionId)
+}
+
 /**
  * Applies a single event to an already-open database.
  * Used both during rebuild and for incremental updates (append → applyEvent).
@@ -277,6 +328,10 @@ export function applyEvent(db: Database.Database, event: AipimEvent): void {
             return handleTaskDependencyAdded(db, event)
         case 'task.dependency_removed':
             return handleTaskDependencyRemoved(db, event)
+        case 'discovery.started':
+            return handleDiscoveryStarted(db, event)
+        case 'discovery.state_updated':
+            return handleDiscoveryStateUpdated(db, event)
         // Events that don't mutate derived state (content_updated, dependency_*, session_*)
         default:
             break
@@ -422,6 +477,59 @@ export function getAllDependencies(db: Database.Database): DependencyEdge[] {
 
 export function getDecisions(db: Database.Database): DecisionRow[] {
     return db.prepare('SELECT * FROM decisions ORDER BY created_at DESC').all() as DecisionRow[]
+}
+
+export interface DiscoverySessionRow {
+    id: string
+    topic: string
+    status: string
+    started_at: string
+    updated_at: string
+    actor: string
+}
+
+export interface DiscoveryStateRow {
+    id: string
+    session_id: string
+    version: number
+    state: string
+    created_at: string
+}
+
+export function getDiscoverySession(db: Database.Database, sessionId: string): DiscoverySessionRow | undefined {
+    return db.prepare('SELECT * FROM discovery_sessions WHERE id = ?').get(sessionId) as DiscoverySessionRow | undefined
+}
+
+/**
+ * Lists discovery sessions, most recently touched first.
+ */
+export function queryDiscoverySessions(db: Database.Database, filter?: { status?: string }): DiscoverySessionRow[] {
+    if (filter?.status) {
+        return db
+            .prepare('SELECT * FROM discovery_sessions WHERE status = ? ORDER BY updated_at DESC')
+            .all(filter.status) as DiscoverySessionRow[]
+    }
+    return db.prepare('SELECT * FROM discovery_sessions ORDER BY updated_at DESC').all() as DiscoverySessionRow[]
+}
+
+/**
+ * Returns the newest distilled-state snapshot for a session, or undefined when
+ * the session was started but nothing has been distilled into it yet.
+ */
+export function getLatestDiscoveryState(db: Database.Database, sessionId: string): DiscoveryStateRow | undefined {
+    return db
+        .prepare('SELECT * FROM discovery_states WHERE session_id = ? ORDER BY version DESC LIMIT 1')
+        .get(sessionId) as DiscoveryStateRow | undefined
+}
+
+/**
+ * Returns every snapshot for a session, oldest first — the version history the
+ * append-only log gives us for free.
+ */
+export function getDiscoveryStates(db: Database.Database, sessionId: string): DiscoveryStateRow[] {
+    return db
+        .prepare('SELECT * FROM discovery_states WHERE session_id = ? ORDER BY version ASC')
+        .all(sessionId) as DiscoveryStateRow[]
 }
 
 export function getStats(db: Database.Database): Record<string, number> {

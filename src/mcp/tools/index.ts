@@ -26,5 +26,6 @@ export interface McpTool {
 
 import { readTools } from './read.js'
 import { writeTools } from './write.js'
+import { discoveryTools } from './discovery.js'
 
-export const CORE_TOOLS: McpTool[] = [...readTools, ...writeTools]
+export const CORE_TOOLS: McpTool[] = [...readTools, ...writeTools, ...discoveryTools]

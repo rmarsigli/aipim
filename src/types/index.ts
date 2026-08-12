@@ -70,6 +70,8 @@ export type EventType =
     | 'task.completed'
     | 'decision.logged'
     | 'check.run'
+    | 'discovery.started'
+    | 'discovery.state_updated'
     | 'session.started'
     | 'session.ended'
 
@@ -85,6 +87,8 @@ export const EVENT_TYPES: EventType[] = [
     'task.completed',
     'decision.logged',
     'check.run',
+    'discovery.started',
+    'discovery.state_updated',
     'session.started',
     'session.ended'
 ]
@@ -95,6 +99,12 @@ export interface BaseEvent {
     timestamp: string // ISO 8601
     actor: string // git config user.email or AIPIM_USER
     projectRoot?: string
+    /**
+     * The discovery session this event came from, when it came from one.
+     * Set on every event a changeset application emits, which is what makes
+     * a task or decision traceable back to the conversation that produced it.
+     */
+    sessionId?: string
 }
 
 export interface TaskCreatedEvent extends BaseEvent {
@@ -182,6 +192,81 @@ export interface DecisionLoggedEvent extends BaseEvent {
     filePath?: string
 }
 
+// ─── Discovery ─────────────────────────────────────────────────────────────
+
+export const DISCOVERY_STATUSES = ['open', 'proposed', 'applied', 'abandoned'] as const
+export type DiscoveryStatus = (typeof DISCOVERY_STATUSES)[number]
+
+export interface Agreement {
+    statement: string
+    rationale: string
+}
+
+/** An option that was considered and dropped. The reason is the point. */
+export interface Alternative {
+    option: string
+    rejectedBecause: string
+}
+
+/**
+ * A question the user chose to skip, together with the premise adopted in the
+ * absence of an answer.
+ *
+ * Skipping is never silent. The assumption is simultaneously the record of what
+ * was decided without an answer and the agenda for resuming the session later:
+ * people come back to a discovery exactly when a skipped question turns out to
+ * have been load-bearing.
+ */
+export interface Assumption {
+    question: string
+    assumed: string
+    critical: boolean
+}
+
+export const GROUNDING_RELATIONS = ['overlaps', 'conflicts', 'supersedes'] as const
+export type GroundingRelation = (typeof GROUNDING_RELATIONS)[number]
+
+/** Something already in the project that the discussion touches. */
+export interface GroundingRef {
+    kind: 'task' | 'decision'
+    id: string
+    relation: GroundingRelation
+    note?: string
+}
+
+/**
+ * The distilled state of a discovery session, rewritten whole on every turn.
+ *
+ * Stored as a snapshot rather than as granular per-note events because the log
+ * is append-only: keeping the whole state each turn yields version history for
+ * free, and no query anyone actually makes needs the granular form. It also
+ * matches how an agent works — it re-derives the whole state each turn anyway.
+ *
+ * `assumptions` is questions that were asked and skipped; `openThreads` is
+ * questions not yet asked. The distinction matters: assumptions flow into the
+ * output, open threads are the agent's own scratch list.
+ */
+export interface DiscoveryState {
+    problem: string
+    agreements: Agreement[]
+    alternatives: Alternative[]
+    assumptions: Assumption[]
+    grounding: GroundingRef[]
+    openThreads: string[]
+}
+
+export interface DiscoveryStartedEvent extends BaseEvent {
+    type: 'discovery.started'
+    sessionId: string
+    topic: string
+}
+
+export interface DiscoveryStateUpdatedEvent extends BaseEvent {
+    type: 'discovery.state_updated'
+    sessionId: string
+    state: DiscoveryState
+}
+
 export interface SessionStartedEvent extends BaseEvent {
     type: 'session.started'
     sessionNumber: number
@@ -205,5 +290,7 @@ export type AipimEvent =
     | TaskDependencyRemovedEvent
     | DecisionLoggedEvent
     | CheckRunEvent
+    | DiscoveryStartedEvent
+    | DiscoveryStateUpdatedEvent
     | SessionStartedEvent
     | SessionEndedEvent
