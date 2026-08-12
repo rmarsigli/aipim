@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] - 2026-08-12
+
+Two install-time bugs, both found by installing the package the way a new user would rather
+than by reading the code.
+
+### Fixed
+
+- **`aipim install` never excluded the derived read model from git.** The repo has ignored
+  `.project/data.db` and its `-wal`/`-shm` companions since 2.0, but the installer only ever
+  wrote `.gitattributes`, so every project created by AIPIM committed a binary SQLite file
+  that churns on every event and conflicts on every merge. `setupGitIgnore` is now the
+  sibling of `setupGitAttributes`: same idempotent shape, appends to an existing
+  `.gitignore`, creates one when absent, never duplicates.
+
+- **A missing better-sqlite3 native binding surfaced as twelve lines of candidate paths.**
+  pnpm v10 blocks package install scripts by default, so `pnpm add -g aipim` produces an
+  install whose native binding was never compiled. better-sqlite3 loads that binding lazily,
+  so `aipim --version` and even `aipim install` succeed — the failure only appears later, at
+  the first command that opens the database, as a raw `bindings` error naming no cause and no
+  fix. `openDb()` and the `database` skill now recognise it and explain what happened and
+  which command repairs it.
+
+  This is a consumer-side pnpm policy, so it cannot be fixed from inside the package. What
+  changed is that it no longer looks like an AIPIM bug.
+
 ## [2.3.1] - 2026-08-12
 
 A packaging fix. The 2.3.0 feature set is unchanged — this is what makes part of it actually
