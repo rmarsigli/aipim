@@ -319,3 +319,33 @@ describe('CORS headers', () => {
         expect(corsHeader).toBeNull()
     })
 })
+
+describe('GET /api/graph', () => {
+    it('returns an empty graph for a fresh project', async () => {
+        const res = await buildApp(db).request('/api/graph')
+
+        expect(res.status).toBe(200)
+        const body = (await res.json()) as Record<string, unknown>
+        expect(body.nodes).toEqual([])
+        expect(body.ready).toEqual([])
+    })
+
+    it('returns the ready frontier and blocked set', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+        applyEvent(db, {
+            id: 'dep-1',
+            type: 'task.dependency_added',
+            timestamp: new Date().toISOString(),
+            actor: 'test@example.com',
+            taskId: 'TASK-002',
+            dependsOn: 'TASK-001',
+        })
+
+        const res = await buildApp(db).request('/api/graph')
+        const body = (await res.json()) as Record<string, unknown>
+
+        expect(body.ready).toEqual(['TASK-001'])
+        expect(body.blocked).toEqual(['TASK-002'])
+    })
+})

@@ -7,6 +7,7 @@ import { existsSync } from 'fs'
 import Database from 'better-sqlite3'
 import { queryTasks, getTask, getCommentsForTask, getDecisions, getStats, applyEvent } from '../core/db.js'
 import { appendEvent, readEvents, readEventsForTask } from '../core/events.js'
+import { loadTaskGraph } from '../core/graph.js'
 import { loadConfig } from '../core/team.js'
 import { validatePath, SecurityError } from '../utils/path-validator.js'
 import { AipimEvent, EVENT_TYPES } from '../types/index.js'
@@ -123,6 +124,11 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
     // GET /api/stats
     app.get('/api/stats', (c) => {
         return c.json(getStats(db))
+    })
+
+    // GET /api/graph — dependency graph with the ready frontier and cycles
+    app.get('/api/graph', (c) => {
+        return c.json(loadTaskGraph(db))
     })
 
     // GET /api/team

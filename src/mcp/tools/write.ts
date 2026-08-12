@@ -3,7 +3,15 @@ import { join, basename } from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { appendEvent } from '../../core/events.js'
-import { applyEvent, getTask, queryTasks, getChecksForTask } from '../../core/db.js'
+import {
+    applyEvent,
+    getTask,
+    queryTasks,
+    getChecksForTask,
+    getDependencies,
+    getAllDependencies
+} from '../../core/db.js'
+import { wouldCreateCycle } from '../../core/graph.js'
 import { getMember } from '../../core/team.js'
 import { getRequiredChecks, evaluateGate, lastActivityAt, explainGate } from '../../core/verification.js'
 import { validatePathSafe } from '../../utils/path-validator.js'
@@ -414,6 +422,72 @@ export const writeTools: McpTool[] = [
             applyEvent(db, event)
 
             return { success: true, taskId, filePath }
+        }
+    },
+
+    {
+        schema: {
+            name: 'add_dependency',
+            description:
+                'Declare that a task depends on another one. The dependent task stays out of the ready frontier until its dependency is done. Cycles are rejected.',
+            inputSchema: {
+                type: 'object',
+                required: ['taskId', 'dependsOn'],
+                properties: {
+                    taskId: { type: 'string', description: 'The task that waits' },
+                    dependsOn: { type: 'string', description: 'The task that must finish first' }
+                }
+            }
+        },
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
+            const taskId = args.taskId as string
+            const dependsOn = args.dependsOn as string
+
+            if (!getTask(db, taskId)) throw new Error(`Task ${taskId} not found`)
+            if (!getTask(db, dependsOn)) throw new Error(`Task ${dependsOn} not found`)
+
+            if (getDependencies(db, taskId).includes(dependsOn)) {
+                return { success: true, taskId, dependsOn, alreadyExisted: true }
+            }
+
+            if (wouldCreateCycle(getAllDependencies(db), taskId, dependsOn)) {
+                throw new Error(
+                    `Cannot add ${taskId} → ${dependsOn}: it would create a dependency cycle. Call get_task_graph to inspect the current edges.`
+                )
+            }
+
+            const event = await appendEvent(projectRoot, { type: 'task.dependency_added', taskId, dependsOn })
+            applyEvent(db, event)
+
+            return { success: true, taskId, dependsOn, alreadyExisted: false }
+        }
+    },
+
+    {
+        schema: {
+            name: 'remove_dependency',
+            description: 'Remove a dependency edge between two tasks.',
+            inputSchema: {
+                type: 'object',
+                required: ['taskId', 'dependsOn'],
+                properties: {
+                    taskId: { type: 'string' },
+                    dependsOn: { type: 'string' }
+                }
+            }
+        },
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
+            const taskId = args.taskId as string
+            const dependsOn = args.dependsOn as string
+
+            if (!getDependencies(db, taskId).includes(dependsOn)) {
+                throw new Error(`No dependency from ${taskId} to ${dependsOn}`)
+            }
+
+            const event = await appendEvent(projectRoot, { type: 'task.dependency_removed', taskId, dependsOn })
+            applyEvent(db, event)
+
+            return { success: true, taskId, dependsOn }
         }
     },
 

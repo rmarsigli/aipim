@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import { openDb, rebuild, applyEvent, getTask, queryTasks, getChecksForTask } from '../../src/core/db.js'
+import { openDb, rebuild, applyEvent, getTask, queryTasks, getChecksForTask, getDependencies } from '../../src/core/db.js'
 import { writeTools } from '../../src/mcp/tools/write.js'
 import type { ToolContext } from '../../src/mcp/tools/index.js'
 import type { TaskCreatedEvent } from '../../src/types/index.js'
@@ -457,5 +457,87 @@ describe('complete_task verification gate', () => {
         const events = content.trim().split('\n').map((l) => JSON.parse(l))
         const completedEvt = events.find((e: { type: string }) => e.type === 'task.completed')
         expect(completedEvt.checksBypassed).toBe(true)
+    })
+})
+
+describe('add_dependency', () => {
+    const tool = makeTool('add_dependency')
+
+    it('throws when the task does not exist', async () => {
+        seedTask(db, 'TASK-001')
+        await expect(tool.handler(ctx, { taskId: 'TASK-999', dependsOn: 'TASK-001' })).rejects.toThrow('TASK-999 not found')
+    })
+
+    it('throws when the dependency does not exist', async () => {
+        seedTask(db, 'TASK-001')
+        await expect(tool.handler(ctx, { taskId: 'TASK-001', dependsOn: 'TASK-999' })).rejects.toThrow('TASK-999 not found')
+    })
+
+    it('records the edge in the read model', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        expect(getDependencies(db, 'TASK-002')).toEqual(['TASK-001'])
+    })
+
+    it('appends a task.dependency_added event', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        const content = readFileSync(join(TEST_ROOT, '.project/events.jsonl'), 'utf8')
+        const events = content.trim().split('\n').map((l) => JSON.parse(l))
+        const evt = events.find((e: { type: string }) => e.type === 'task.dependency_added')
+        expect(evt.taskId).toBe('TASK-002')
+        expect(evt.dependsOn).toBe('TASK-001')
+    })
+
+    it('refuses a self-dependency', async () => {
+        seedTask(db, 'TASK-001')
+
+        await expect(tool.handler(ctx, { taskId: 'TASK-001', dependsOn: 'TASK-001' })).rejects.toThrow('cycle')
+    })
+
+    it('refuses an edge that would create a cycle', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        await expect(tool.handler(ctx, { taskId: 'TASK-001', dependsOn: 'TASK-002' })).rejects.toThrow('cycle')
+    })
+
+    it('is idempotent when the edge already exists', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        expect(getDependencies(db, 'TASK-002')).toEqual(['TASK-001'])
+    })
+})
+
+describe('remove_dependency', () => {
+    const add = makeTool('add_dependency')
+    const tool = makeTool('remove_dependency')
+
+    it('drops the edge from the read model', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+        await add.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        await tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })
+
+        expect(getDependencies(db, 'TASK-002')).toEqual([])
+    })
+
+    it('throws when the edge does not exist', async () => {
+        seedTask(db, 'TASK-001')
+        seedTask(db, 'TASK-002')
+
+        await expect(tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })).rejects.toThrow('No dependency')
     })
 })

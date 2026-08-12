@@ -9,7 +9,9 @@ import {
     TaskCommentAddedEvent,
     TaskCompletedEvent,
     DecisionLoggedEvent,
-    CheckRunEvent
+    CheckRunEvent,
+    TaskDependencyAddedEvent,
+    TaskDependencyRemovedEvent
 } from '../types/index.js'
 
 const DB_FILE = '.project/data.db'
@@ -62,6 +64,13 @@ CREATE TABLE IF NOT EXISTS decisions (
     created_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS task_dependencies (
+    task_id     TEXT NOT NULL,
+    depends_on  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (task_id, depends_on)
+);
+
 CREATE TABLE IF NOT EXISTS checks (
     id          TEXT PRIMARY KEY,
     task_id     TEXT NOT NULL,
@@ -86,6 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
 CREATE INDEX IF NOT EXISTS idx_checks_task    ON checks(task_id);
+CREATE INDEX IF NOT EXISTS idx_deps_depends_on ON task_dependencies(depends_on);
 `
 
 export function openDb(projectRoot: string): Database.Database {
@@ -103,6 +113,7 @@ export function rebuild(projectRoot: string, events: AipimEvent[]): void {
 
     db.exec('DROP TABLE IF EXISTS events_log')
     db.exec('DROP TABLE IF EXISTS checks')
+    db.exec('DROP TABLE IF EXISTS task_dependencies')
     db.exec('DROP TABLE IF EXISTS comments')
     db.exec('DROP TABLE IF EXISTS decisions')
     db.exec('DROP TABLE IF EXISTS tasks')
@@ -192,6 +203,18 @@ function handleCheckRun(db: Database.Database, event: CheckRunEvent): void {
     )
 }
 
+function handleTaskDependencyAdded(db: Database.Database, event: TaskDependencyAddedEvent): void {
+    db.prepare(`INSERT OR IGNORE INTO task_dependencies (task_id, depends_on, created_at) VALUES (?, ?, ?)`).run(
+        event.taskId,
+        event.dependsOn,
+        event.timestamp
+    )
+}
+
+function handleTaskDependencyRemoved(db: Database.Database, event: TaskDependencyRemovedEvent): void {
+    db.prepare(`DELETE FROM task_dependencies WHERE task_id = ? AND depends_on = ?`).run(event.taskId, event.dependsOn)
+}
+
 /**
  * Applies a single event to an already-open database.
  * Used both during rebuild and for incremental updates (append → applyEvent).
@@ -220,6 +243,10 @@ export function applyEvent(db: Database.Database, event: AipimEvent): void {
             return handleDecisionLogged(db, event)
         case 'check.run':
             return handleCheckRun(db, event)
+        case 'task.dependency_added':
+            return handleTaskDependencyAdded(db, event)
+        case 'task.dependency_removed':
+            return handleTaskDependencyRemoved(db, event)
         // Events that don't mutate derived state (content_updated, dependency_*, session_*)
         default:
             break
@@ -326,6 +353,41 @@ export function getChecksForTask(db: Database.Database, taskId: string): CheckRo
         Omit<CheckRow, 'passed'> & { passed: number }
     >
     return rows.map((row) => ({ ...row, passed: row.passed === 1 }))
+}
+
+export interface DependencyEdge {
+    taskId: string
+    dependsOn: string
+}
+
+/**
+ * Returns the IDs of the tasks a given task depends on.
+ */
+export function getDependencies(db: Database.Database, taskId: string): string[] {
+    const rows = db
+        .prepare('SELECT depends_on FROM task_dependencies WHERE task_id = ? ORDER BY depends_on ASC')
+        .all(taskId) as Array<{ depends_on: string }>
+    return rows.map((r) => r.depends_on)
+}
+
+/**
+ * Returns the IDs of the tasks blocked by a given task — the reverse edge.
+ */
+export function getDependents(db: Database.Database, taskId: string): string[] {
+    const rows = db
+        .prepare('SELECT task_id FROM task_dependencies WHERE depends_on = ? ORDER BY task_id ASC')
+        .all(taskId) as Array<{ task_id: string }>
+    return rows.map((r) => r.task_id)
+}
+
+/**
+ * Returns every dependency edge in the project.
+ */
+export function getAllDependencies(db: Database.Database): DependencyEdge[] {
+    const rows = db
+        .prepare('SELECT task_id, depends_on FROM task_dependencies ORDER BY task_id ASC, depends_on ASC')
+        .all() as Array<{ task_id: string; depends_on: string }>
+    return rows.map((r) => ({ taskId: r.task_id, dependsOn: r.depends_on }))
 }
 
 export function getDecisions(db: Database.Database): DecisionRow[] {

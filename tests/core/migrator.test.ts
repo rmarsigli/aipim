@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { migrate, extractTaskId, extractTaskType } from '../../src/core/migrator.js'
 import { readEvents } from '../../src/core/events.js'
-import { openDb, getTask, queryTasks } from '../../src/core/db.js'
+import { openDb, getTask, queryTasks, getDependencies } from '../../src/core/db.js'
 
 const TEST_ROOT = join(process.cwd(), 'tests/__fixtures__/migrator-test')
 
@@ -167,4 +167,60 @@ describe('extractTaskType', () => {
     it('detects chore', () => expect(extractTaskType('TASK-003-chore-ci.md')).toBe('chore'))
     it('detects docs', () => expect(extractTaskType('TASK-004-docs-readme.md')).toBe('docs'))
     it('defaults to feat when unknown', () => expect(extractTaskType('TASK-005-setup.md')).toBe('feat'))
+})
+
+describe('migrate dependencies from frontmatter', () => {
+    const DEPENDENT = `---
+title: "Depends on the other one"
+priority: P2-M
+status: backlog
+depends_on: [TASK-001]
+---
+
+# Content
+`
+
+    it('turns depends_on frontmatter into dependency events', async () => {
+        writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-001-base.md'), BACKLOG_TASK)
+        writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-11-TASK-002-dependent.md'), DEPENDENT)
+
+        await migrate(TEST_ROOT)
+
+        const events = readEvents(TEST_ROOT)
+        const dep = events.find((e) => e.type === 'task.dependency_added')
+        expect(dep).toBeDefined()
+        expect((dep as { taskId: string }).taskId).toBe('TASK-002')
+        expect((dep as { dependsOn: string }).dependsOn).toBe('TASK-001')
+    })
+
+    it('normalises a short T001 reference to TASK-001', async () => {
+        const shortRef = DEPENDENT.replace('[TASK-001]', '[T001]')
+        writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-001-base.md'), BACKLOG_TASK)
+        writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-11-TASK-002-dependent.md'), shortRef)
+
+        await migrate(TEST_ROOT)
+
+        const dep = readEvents(TEST_ROOT).find((e) => e.type === 'task.dependency_added')
+        expect((dep as { dependsOn: string }).dependsOn).toBe('TASK-001')
+    })
+
+    it('skips a dependency pointing at a task that was not migrated', async () => {
+        const dangling = DEPENDENT.replace('[TASK-001]', '[TASK-404]')
+        writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-11-TASK-002-dependent.md'), dangling)
+
+        await migrate(TEST_ROOT)
+
+        expect(readEvents(TEST_ROOT).some((e) => e.type === 'task.dependency_added')).toBe(false)
+    })
+
+    it('records the edge in the rebuilt database', async () => {
+        writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-10-TASK-001-base.md'), BACKLOG_TASK)
+        writeFileSync(join(TEST_ROOT, '.project/backlog/2026-01-11-TASK-002-dependent.md'), DEPENDENT)
+
+        await migrate(TEST_ROOT)
+
+        const db = openDb(TEST_ROOT)
+        expect(getDependencies(db, 'TASK-002')).toEqual(['TASK-001'])
+        db.close()
+    })
 })
