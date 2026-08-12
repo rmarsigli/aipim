@@ -15,6 +15,18 @@ description = "Project description"
 # [hooks]
 # block_on_unverified = true
 
+# Consensus gate for discovery changesets. Every field is off unless set, so
+# leaving this out disables the gate entirely.
+#   max_open_critical       — refuse to apply while critical assumptions are open
+#   max_tasks_per_changeset — cap against a session inventing a whole fake backlog
+#   require_estimates       — every proposed task carries estimatedHours
+#   require_grounding       — a non-empty project must record what the idea touches
+# [discovery]
+# max_open_critical = 0
+# max_tasks_per_changeset = 15
+# require_estimates = true
+# require_grounding = true
+
 # Add team members below (optional — works as solo dev without this)
 # [[team]]
 # id = "alice"

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import { mkdirSync, rmSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Database from 'better-sqlite3'
 import { openDb, rebuild, applyEvent } from '../../src/core/db.js'
@@ -259,6 +259,114 @@ describe('resolve_changeset', () => {
 
         const result = await call('resolve_changeset', { sessionId: second, changesetId, resolution: 'applied' })
         expect(result.error).toContain('does not belong')
+    })
+})
+
+describe('the consensus gate', () => {
+    function withGate(toml: string): void {
+        writeFileSync(join(TEST_ROOT, '.project/config.toml'), `[project]\nname = "test"\n\n${toml}`, 'utf8')
+    }
+
+    async function proposeWithCriticalAssumption(): Promise<string> {
+        const sessionId = await openSession()
+        await call('update_discovery_state', {
+            sessionId,
+            state: { assumptions: [{ question: 'which database?', assumed: 'postgres', critical: true }] }
+        })
+        await call('propose_changeset', {
+            sessionId,
+            changeset: { tasks: [{ localId: '#1', title: 'Build', taskType: 'feat', priority: 'P2-M' }] }
+        })
+        return sessionId
+    }
+
+    it('should be a no-op with no [discovery] configured', async () => {
+        const sessionId = await proposeWithCriticalAssumption()
+        expect((await call('resolve_changeset', { sessionId, resolution: 'applied' })).success).toBe(true)
+    })
+
+    it('should refuse to apply while a critical assumption is open', async () => {
+        withGate('[discovery]\nmax_open_critical = 0\n')
+        const sessionId = await proposeWithCriticalAssumption()
+
+        const result = await call('resolve_changeset', { sessionId, resolution: 'applied' })
+        expect(result.error).toContain('consensus gate')
+        expect(result.success).toBeUndefined()
+        expect(db.prepare('SELECT COUNT(*) AS count FROM tasks').get()).toEqual({ count: 0 })
+    })
+
+    it('should apply on force and record the bypass', async () => {
+        withGate('[discovery]\nmax_open_critical = 0\n')
+        const sessionId = await proposeWithCriticalAssumption()
+
+        const result = await call('resolve_changeset', { sessionId, resolution: 'applied', force: true })
+        const resolved = db
+            .prepare(`SELECT payload FROM events_log WHERE type = 'discovery.resolved'`)
+            .get() as { payload: string }
+
+        expect(result.success).toBe(true)
+        expect(JSON.parse(resolved.payload).validatorsBypassed).toBe(true)
+    })
+
+    it('should not record a bypass when force was passed but nothing was failing', async () => {
+        const sessionId = await proposeWithCriticalAssumption()
+        await call('resolve_changeset', { sessionId, resolution: 'applied', force: true })
+
+        const resolved = db
+            .prepare(`SELECT payload FROM events_log WHERE type = 'discovery.resolved'`)
+            .get() as { payload: string }
+        expect(JSON.parse(resolved.payload).validatorsBypassed).toBeUndefined()
+    })
+
+    it('should refuse a task with no estimate when estimates are required', async () => {
+        withGate('[discovery]\nrequire_estimates = true\n')
+        const sessionId = await openSession()
+        await call('propose_changeset', {
+            sessionId,
+            changeset: { tasks: [{ localId: '#1', title: 'No estimate', taskType: 'feat', priority: 'P2-M' }] }
+        })
+
+        expect((await call('resolve_changeset', { sessionId, resolution: 'applied' })).failures).toEqual([
+            expect.stringContaining('#1')
+        ])
+    })
+
+    it('should never let force past structural validation', async () => {
+        withGate('[discovery]\nmax_open_critical = 0\n')
+        const sessionId = await openSession()
+        await call('propose_changeset', {
+            sessionId,
+            changeset: { dependencies: [{ taskRef: 'TASK-404', dependsOnRef: 'TASK-405' }] }
+        })
+
+        const result = await call('resolve_changeset', { sessionId, resolution: 'applied', force: true })
+        expect(result.error).toContain('cannot be applied')
+    })
+})
+
+describe('the markdown record', () => {
+    it('should be written on application, carrying what was rejected', async () => {
+        const sessionId = await openSession('discovery as a phase')
+        await call('update_discovery_state', {
+            sessionId,
+            state: {
+                problem: 'no home for ideas',
+                alternatives: [{ option: 'granular events', rejectedBecause: 'no query needs them' }]
+            }
+        })
+        await call('propose_changeset', {
+            sessionId,
+            changeset: { tasks: [{ localId: '#1', title: 'Build it', taskType: 'feat', priority: 'P2-M' }] }
+        })
+
+        const result = await call('resolve_changeset', { sessionId, resolution: 'applied' })
+        const recordPath = (result.applied as { recordPath: string }).recordPath
+        const record = readFileSync(join(TEST_ROOT, recordPath), 'utf8')
+
+        expect(recordPath).toContain('.project/discovery/')
+        expect(record).toContain('no home for ideas')
+        expect(record).toContain('no query needs them')
+        expect(record).toContain('status: applied')
     })
 })
 

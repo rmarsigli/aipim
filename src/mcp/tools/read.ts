@@ -6,6 +6,7 @@ import { queryTasks, getBlockers, getTask, getCommentsForTask, getStats, getDepe
 import { getNextReadyTask, loadTaskGraph } from '../../core/graph.js'
 import { readEventsForTask } from '../../core/events.js'
 import { getRequiredChecks } from '../../core/verification.js'
+import { openDiscoveries } from '../../core/discovery.js'
 import type { McpTool, ToolContext } from './index.js'
 
 function currentBranch(): string {
@@ -62,6 +63,8 @@ export const readTools: McpTool[] = [
                 blockers,
                 graph: { ready: graph.ready, blocked: graph.blocked, cycles: graph.cycles },
                 requiredChecks: getRequiredChecks(projectRoot),
+                // Reported, never entered: discovery only starts when the user asks for it.
+                openDiscoveries: openDiscoveries(db),
                 recentEvents,
                 session: { number: ctx.session ?? null, branch, nextAction: ctx.nextAction ?? null }
             }

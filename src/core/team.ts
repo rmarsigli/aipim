@@ -18,6 +18,13 @@ export interface ProjectConfig {
     checks?: { commands?: unknown[] }
     /** Claude Code hook behaviour. See core/hooks.ts. */
     hooks?: { block_on_unverified?: boolean }
+    /** Consensus gate for discovery changesets. See core/discovery-gate.ts. */
+    discovery?: {
+        max_open_critical?: unknown
+        max_tasks_per_changeset?: unknown
+        require_estimates?: unknown
+        require_grounding?: unknown
+    }
 }
 
 export function loadConfig(projectRoot: string): ProjectConfig | null {

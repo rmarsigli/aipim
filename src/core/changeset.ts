@@ -12,6 +12,7 @@ import {
     ChangesetRow
 } from './db.js'
 import { detectCycles } from './graph.js'
+import { writeDiscoveryMirror } from './discovery.js'
 import { adrMarkdown, slugify, taskMarkdown, today } from './markdown.js'
 import { validatePath } from '../utils/path-validator.js'
 import {
@@ -218,6 +219,8 @@ export interface AppliedChangeset {
     dependencies: Array<{ taskId: string; dependsOn: string }>
     decisions: Array<{ decisionId: string; title: string; filePath: string }>
     docs: string[]
+    /** The human-readable record of the session, written on application. */
+    recordPath: string | null
     eventCount: number
 }
 
@@ -328,7 +331,12 @@ export async function applyChangeset(
 
     const decisionEvents = events.filter((event) => event.type === 'decision.logged')
 
+    // Written after the resolution event has been applied, so the record shows
+    // the session as resolved rather than mid-flight.
+    const recordPath = writeDiscoveryMirror(projectRoot, db, sessionId)
+
     return {
+        recordPath,
         tasks: taskFiles.map((entry) => ({
             localId: entry.task.localId,
             taskId: entry.taskId,

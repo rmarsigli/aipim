@@ -247,6 +247,20 @@ describe('appendEvents', () => {
         ])
     })
 
+    it('does not serve a stale parse after the file is replaced', async () => {
+        await appendEvent(TEST_ROOT, created('TASK-001'))
+        expect(readEvents(TEST_ROOT)).toHaveLength(1)
+
+        // A file deleted and recreated can land on the same mtime, which is why
+        // the cache keys on inode and size too.
+        rmSync(EVENTS_FILE)
+        await appendEvents(TEST_ROOT, [created('TASK-002'), created('TASK-003')])
+
+        const events = readEvents(TEST_ROOT)
+        expect(events).toHaveLength(2)
+        expect(events.map((e) => ('taskId' in e ? e.taskId : null))).toEqual(['TASK-002', 'TASK-003'])
+    })
+
     it('writes nothing for an empty batch', async () => {
         expect(await appendEvents(TEST_ROOT, [])).toEqual([])
         expect(existsSync(EVENTS_FILE)).toBe(false)

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import { mkdirSync, rmSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import Database from 'better-sqlite3'
 import { openDb, rebuild, applyEvent, getDiscoveryStates } from '../../src/core/db.js'
@@ -12,7 +12,9 @@ import {
     normaliseDiscoveryState,
     openDiscoveries,
     recordDiscoveryState,
-    startDiscovery
+    renderDiscoveryMarkdown,
+    startDiscovery,
+    writeDiscoveryMirror
 } from '../../src/core/discovery.js'
 import type { DecisionLoggedEvent, TaskCreatedEvent } from '../../src/types/index.js'
 
@@ -208,6 +210,55 @@ describe('openDiscoveries', () => {
         expect(openDiscoveries(db)).toEqual([
             expect.objectContaining({ id: sessionId, openAssumptions: 2, criticalAssumptions: 1 })
         ])
+    })
+})
+
+describe('renderDiscoveryMarkdown', () => {
+    it('should keep the rejected alternatives and the open assumptions', async () => {
+        const { sessionId } = await startDiscovery(TEST_ROOT, db, 'discovery as a phase')
+        await recordDiscoveryState(TEST_ROOT, db, sessionId, {
+            problem: 'AIPIM starts at the task',
+            agreements: [{ statement: 'changeset, not spec', rationale: 'greenfield degenerates for free' }],
+            alternatives: [{ option: 'granular note events', rejectedBecause: 'buys no query anyone makes' }],
+            assumptions: [{ question: 'which harness first?', assumed: 'claude-code', critical: true }],
+            grounding: [{ kind: 'task', id: 'TASK-037', relation: 'overlaps', note: 'provenance graph' }]
+        })
+
+        const loaded = loadDiscovery(db, sessionId)
+        const markdown = renderDiscoveryMarkdown(loaded!.session, loaded!.state)
+
+        expect(markdown).toContain('id: D001')
+        expect(markdown).toContain('AIPIM starts at the task')
+        expect(markdown).toContain('granular note events')
+        expect(markdown).toContain('buys no query anyone makes')
+        expect(markdown).toContain('**(critical)** which harness first?')
+        expect(markdown).toContain('overlaps task `TASK-037`')
+    })
+
+    it('should omit sections that have nothing in them', async () => {
+        const { sessionId } = await startDiscovery(TEST_ROOT, db, 'sparse')
+        const loaded = loadDiscovery(db, sessionId)
+        const markdown = renderDiscoveryMarkdown(loaded!.session, loaded!.state)
+
+        expect(markdown).not.toContain('## Alternatives rejected')
+        expect(markdown).not.toContain('## Problem')
+        expect(markdown).toContain('# sparse')
+    })
+})
+
+describe('writeDiscoveryMirror', () => {
+    it('should write the record next to the other project markdown', async () => {
+        const { sessionId } = await startDiscovery(TEST_ROOT, db, 'the mirror')
+        await recordDiscoveryState(TEST_ROOT, db, sessionId, { problem: 'needs a home' })
+
+        const filePath = writeDiscoveryMirror(TEST_ROOT, db, sessionId)
+
+        expect(filePath).toMatch(/^\.project\/discovery\/\d{4}-\d{2}-\d{2}-D001-the-mirror\.md$/)
+        expect(readFileSync(join(TEST_ROOT, filePath as string), 'utf8')).toContain('needs a home')
+    })
+
+    it('should return null for a session that does not exist', () => {
+        expect(writeDiscoveryMirror(TEST_ROOT, db, 'D999')).toBeNull()
     })
 })
 

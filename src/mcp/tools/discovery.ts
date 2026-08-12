@@ -13,6 +13,12 @@ import {
     resolveWithoutApplying,
     validateChangeset
 } from '../../core/changeset.js'
+import {
+    evaluateDiscoveryGate,
+    explainDiscoveryGate,
+    getDiscoveryGateConfig,
+    projectHasTasks
+} from '../../core/discovery-gate.js'
 import { getChangeset, getProposedChangeset } from '../../core/db.js'
 import type { McpTool, ToolContext } from './index.js'
 
@@ -312,22 +318,30 @@ export const discoveryTools: McpTool[] = [
                 return { success: true, sessionId, resolution }
             }
 
-            const changeset = parseChangeset(row as NonNullable<typeof row>)
+            const proposal = row as NonNullable<typeof row>
+            const changeset = parseChangeset(proposal)
+
+            // Structural validation is not negotiable: a changeset that fails it
+            // cannot be applied coherently at all, so force does not cover it.
             const validation = validateChangeset(db, changeset)
             if (!validation.valid) {
-                return {
-                    error: `Changeset ${(row as NonNullable<typeof row>).id} cannot be applied`,
-                    errors: validation.errors
-                }
+                return { error: `Changeset ${proposal.id} cannot be applied`, errors: validation.errors }
             }
 
-            const applied = await applyChangeset(
-                projectRoot,
-                db,
-                sessionId,
-                (row as NonNullable<typeof row>).id,
-                changeset
+            const force = args.force === true
+            const gate = evaluateDiscoveryGate(
+                getDiscoveryGateConfig(projectRoot),
+                changeset,
+                session.state,
+                projectHasTasks(db)
             )
+            if (!gate.satisfied && !force) {
+                return { error: explainDiscoveryGate(proposal.id, gate), failures: gate.failures }
+            }
+
+            const applied = await applyChangeset(projectRoot, db, sessionId, proposal.id, changeset, {
+                validatorsBypassed: force && !gate.satisfied
+            })
             return { success: true, sessionId, resolution, applied }
         }
     }

@@ -3,8 +3,17 @@ import { join } from 'path'
 import { AipimEvent } from '../types/index.js'
 import { resolveActor } from './team.js'
 
+/**
+ * Cache identity for events.jsonl.
+ *
+ * mtime alone is not enough: a file that is deleted and recreated can land on
+ * the same mtimeMs, and then a stale parse is served for a completely different
+ * file. Inode and size make that collision effectively impossible.
+ */
 interface EventsCache {
     mtime: number
+    size: number
+    inode: number
     events: AipimEvent[]
 }
 
@@ -92,9 +101,9 @@ export function readEvents(projectRoot: string): AipimEvent[] {
     const filePath = join(projectRoot, EVENTS_FILE)
     if (!existsSync(filePath)) return []
 
-    const mtime = statSync(filePath).mtimeMs
+    const { mtimeMs: mtime, size, ino: inode } = statSync(filePath)
     const cached = eventsCache.get(projectRoot)
-    if (cached && cached.mtime === mtime) {
+    if (cached && cached.mtime === mtime && cached.size === size && cached.inode === inode) {
         return cached.events
     }
 
@@ -104,7 +113,7 @@ export function readEvents(projectRoot: string): AipimEvent[] {
         .map((line) => JSON.parse(line) as AipimEvent)
         .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
 
-    eventsCache.set(projectRoot, { mtime, events })
+    eventsCache.set(projectRoot, { mtime, size, inode, events })
     return events
 }
 

@@ -8,6 +8,7 @@ import { signatureManager } from '@/core/signature.js'
 import { fileURLToPath } from 'url'
 import { validatePath } from '@/utils/path-validator.js'
 import { installHooks } from '@/core/hooks.js'
+import { installDiscoverySkill } from '@/core/discovery-skill.js'
 
 const GITATTRIBUTES_MARKER = 'events.jsonl merge=union'
 const GITATTRIBUTES_BLOCK = `\n# AIPIM: prevent merge conflicts in the append-only event log.\n# The union driver keeps all lines from both sides — always correct for append-only logs.\n.project/events.jsonl merge=union\n`
@@ -72,6 +73,9 @@ export async function installProject(config: InstallConfig, _detected: DetectedP
         logger.debug('Registering Claude Code hooks...')
         setupClaudeHooks(process.cwd(), config.dryRun)
     }
+
+    logger.debug('Installing the discovery playbook...')
+    setupDiscoverySkill(process.cwd(), templatesDir, config.ais.includes('claude-code'), config.dryRun)
 
     if (config.dryRun) {
         logger.success('Dry run completed successfully')
@@ -192,6 +196,35 @@ async function generateCursorRules(config: InstallConfig, templatesDir: string):
  *
  * A failure here is not fatal — the project still works without hooks.
  */
+/**
+ * Writes the discovery playbook: a harness-neutral copy under
+ * `.project/prompts/`, plus a real Claude Code skill when that harness is in
+ * play.
+ *
+ * Like hooks, a failure here is not fatal — discovery still works through the
+ * MCP tools, it just has no playbook telling the agent how to run it.
+ */
+export function setupDiscoverySkill(
+    projectRoot: string,
+    templatesDir: string,
+    claudeCode: boolean,
+    dryRun?: boolean
+): void {
+    if (dryRun) {
+        logger.info('[dry-run] Would install the discovery playbook')
+        return
+    }
+
+    try {
+        const { written } = installDiscoverySkill(projectRoot, templatesDir, { claudeCode })
+        logger.debug(`Discovery playbook written to ${written.join(', ')}`)
+    } catch (error) {
+        logger.warn(
+            `Could not install the discovery playbook: ${error instanceof Error ? error.message : String(error)}`
+        )
+    }
+}
+
 export function setupClaudeHooks(projectRoot: string, dryRun?: boolean): void {
     if (dryRun) {
         logger.info('[dry-run] Would register Claude Code hooks in .claude/settings.json')

@@ -7,6 +7,14 @@ description = "Artificial Intelligence Project Instruction Manager"
 [checks]
 commands = ["pnpm test", "pnpm lint", "pnpm type-check"]
 
+# Dogfooding the 2.4 consensus gate: a changeset is not applied while a critical
+# assumption is open, and every proposed task carries an estimate.
+[discovery]
+max_open_critical = 0
+max_tasks_per_changeset = 15
+require_estimates = true
+require_grounding = true
+
 # Add team members below (optional — works as solo dev without this)
 # [[team]]
 # id = "alice"

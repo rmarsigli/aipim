@@ -1,5 +1,8 @@
 import Database from 'better-sqlite3'
+import { mkdirSync, writeFileSync } from 'fs'
+import { dirname, join } from 'path'
 import { appendEvent } from './events.js'
+import { slugify, today } from './markdown.js'
 import {
     applyEvent,
     getDecisions,
@@ -187,6 +190,63 @@ export function openDiscoveries(db: Database.Database): OpenDiscoverySummary[] {
             criticalAssumptions: assumptions.filter((a) => a.critical).length
         }
     })
+}
+
+// ─── Markdown mirror ────────────────────────────────────────────────────────
+
+function section(heading: string, lines: string[]): string {
+    return lines.length > 0 ? `## ${heading}\n\n${lines.join('\n')}\n\n` : ''
+}
+
+/**
+ * Renders a finished session as the document a person reads six months later.
+ *
+ * The rejected alternatives and the open assumptions are the reason this file
+ * exists: an ADR that records only its verdict loses half its value, and a
+ * premise nobody confirmed is worth more stated than implied.
+ */
+export function renderDiscoveryMarkdown(session: DiscoverySessionRow, state: DiscoveryState): string {
+    return (
+        `---\ntitle: "${session.topic}"\nid: ${session.id}\nstarted: ${session.started_at}\n` +
+        `resolved: ${session.updated_at}\nstatus: ${session.status}\n---\n\n` +
+        `# ${session.topic}\n\n` +
+        (state.problem ? `## Problem\n\n${state.problem}\n\n` : '') +
+        section(
+            'Agreements',
+            state.agreements.map((a) => `- **${a.statement}** — ${a.rationale}`)
+        ) +
+        section(
+            'Alternatives rejected',
+            state.alternatives.map((a) => `- **${a.option}** — ${a.rejectedBecause}`)
+        ) +
+        section(
+            'Open assumptions',
+            state.assumptions.map(
+                (a) => `- ${a.critical ? '**(critical)** ' : ''}${a.question} → assumed: ${a.assumed}`
+            )
+        ) +
+        section(
+            'Grounding',
+            state.grounding.map((g) => `- ${g.relation} ${g.kind} \`${g.id}\`${g.note ? ` — ${g.note}` : ''}`)
+        )
+    )
+}
+
+/**
+ * Writes the human-readable record of a session next to `decisions/` and
+ * `completed/`, following the project pattern: event log for the machine,
+ * markdown for the person and for git.
+ */
+export function writeDiscoveryMirror(projectRoot: string, db: Database.Database, sessionId: string): string | null {
+    const loaded = loadDiscovery(db, sessionId)
+    if (!loaded) return null
+
+    const filePath = `.project/discovery/${today()}-${sessionId}-${slugify(loaded.session.topic)}.md`
+    const full = join(projectRoot, filePath)
+    mkdirSync(dirname(full), { recursive: true })
+    writeFileSync(full, renderDiscoveryMarkdown(loaded.session, loaded.state), 'utf8')
+
+    return filePath
 }
 
 // ─── Grounding ──────────────────────────────────────────────────────────────

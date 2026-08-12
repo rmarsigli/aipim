@@ -4,6 +4,7 @@ import { join } from 'path'
 import { queryTasks, getChecksForTask } from './db.js'
 import { loadTaskGraph, getNextReadyTask } from './graph.js'
 import { getRequiredChecks, evaluateGate, lastActivityAt } from './verification.js'
+import { openDiscoveries } from './discovery.js'
 import { loadConfig } from './team.js'
 import { AipimEvent } from '../types/index.js'
 
@@ -143,6 +144,20 @@ export function buildSessionContext(db: Database.Database, projectRoot: string):
     const graph = loadTaskGraph(db)
     const next = getNextReadyTask(db)
     const checks = getRequiredChecks(projectRoot)
+
+    // Open discoveries are reported, never resumed automatically: entering one
+    // is the user's call, and this hook runs without them asking for anything.
+    const discoveries = openDiscoveries(db)
+    if (discoveries.length > 0) {
+        lines.push(
+            `- Open discovery: ${discoveries
+                .map(
+                    (d) =>
+                        `${d.id} (${d.topic})${d.criticalAssumptions > 0 ? ` — ${d.criticalAssumptions} critical assumption(s) open` : ''}`
+                )
+                .join(', ')}. Resume only if the user asks.`
+        )
+    }
 
     if (graph.nodes.length === 0) {
         lines.push('- No tasks yet. Use create_task to add one.')
