@@ -98,8 +98,38 @@ CREATE INDEX IF NOT EXISTS idx_checks_task    ON checks(task_id);
 CREATE INDEX IF NOT EXISTS idx_deps_depends_on ON task_dependencies(depends_on);
 `
 
+/**
+ * Recognises the failure mode where better-sqlite3 was installed but its native
+ * binding was never compiled.
+ *
+ * pnpm v10 blocks install scripts by default, so `pnpm add -g aipim` produces a
+ * package that looks fine until something opens the database. better-sqlite3
+ * loads its binding lazily, which is why `aipim --version` and even
+ * `aipim install` succeed first and give a false sense that the install worked.
+ */
+export function isMissingNativeBinding(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error)
+    return message.includes('better_sqlite3.node') || message.includes('Could not locate the bindings file')
+}
+
+export const MISSING_BINDING_HELP =
+    'SQLite could not start: better-sqlite3 is installed but its native binding was never built.\n\n' +
+    'pnpm blocks package install scripts by default, so the build step was skipped at install\n' +
+    'time. The binding loads lazily, which is why earlier commands appeared to work.\n\n' +
+    'Fix it with:\n\n' +
+    '  pnpm approve-builds -g     # aipim installed globally\n' +
+    '  pnpm approve-builds        # aipim as a project dependency\n\n' +
+    'To declare it up front in a project instead, add to its package.json:\n\n' +
+    '  "pnpm": { "onlyBuiltDependencies": ["better-sqlite3"] }\n'
+
 export function openDb(projectRoot: string): Database.Database {
-    const db = new Database(join(projectRoot, DB_FILE))
+    let db: Database.Database
+    try {
+        db = new Database(join(projectRoot, DB_FILE))
+    } catch (error) {
+        if (isMissingNativeBinding(error)) throw new Error(MISSING_BINDING_HELP)
+        throw error
+    }
     db.pragma('journal_mode = WAL')
     return db
 }

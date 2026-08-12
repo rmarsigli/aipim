@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { isMissingNativeBinding, MISSING_BINDING_HELP } from '../../../core/db.js'
 import { McpTool, ToolContext } from '../../tools/index.js'
 import { ActiveSkill } from '../types.js'
 import path from 'path'
@@ -22,7 +23,12 @@ function getLocalDb(dbPath: unknown, projectRoot: string): Database.Database {
         resolvedPath = candidate
     }
 
-    return new Database(resolvedPath, { fileMustExist: true })
+    try {
+        return new Database(resolvedPath, { fileMustExist: true })
+    } catch (error) {
+        if (isMissingNativeBinding(error)) throw new Error(MISSING_BINDING_HELP)
+        throw error
+    }
 }
 
 export const aipimDbSchema: McpTool = {
