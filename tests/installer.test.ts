@@ -101,10 +101,12 @@ describe('installProject', () => {
     })
 
     test('ignores missing scripts during chmod', async () => {
-        // Mock pathExists to return false for scripts and .gitattributes
+        // Mock pathExists to return false for scripts and the git config files.
+        // The mock answers true for everything else, so any file the installer
+        // reads-after-checking must be listed here or the read hits ENOENT.
         jest.spyOn(fs, 'pathExists').mockImplementation(async (p) => {
-            if (typeof p === 'string' && (p.includes('scripts/') || p.endsWith('.gitattributes'))) return false
-            return true
+            if (typeof p !== 'string') return true
+            return !(p.includes('scripts/') || p.endsWith('.gitattributes') || p.endsWith('.gitignore'))
         })
 
         await installProject(mockConfig, mockDetected)

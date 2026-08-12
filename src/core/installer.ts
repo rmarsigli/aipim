@@ -12,6 +12,9 @@ import { installHooks } from '@/core/hooks.js'
 const GITATTRIBUTES_MARKER = 'events.jsonl merge=union'
 const GITATTRIBUTES_BLOCK = `\n# AIPIM: prevent merge conflicts in the append-only event log.\n# The union driver keeps all lines from both sides — always correct for append-only logs.\n.project/events.jsonl merge=union\n`
 
+const GITIGNORE_MARKER = '.project/data.db'
+const GITIGNORE_BLOCK = `\n# AIPIM: the read model is derived from the event log and rebuilt on demand.\n# events.jsonl is the source of truth; this database is a cache. Committing it\n# means a binary file that churns on every event and conflicts on every merge.\n.project/data.db\n.project/data.db-wal\n.project/data.db-shm\n`
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -58,6 +61,9 @@ export async function installProject(config: InstallConfig, _detected: DetectedP
 
     logger.debug('Configuring .gitattributes...')
     await setupGitAttributes(process.cwd(), config.dryRun)
+
+    logger.debug('Configuring .gitignore...')
+    await setupGitIgnore(process.cwd(), config.dryRun)
 
     logger.debug('Making scripts executable...')
     await makeScriptsExecutable(config.dryRun)
@@ -228,6 +234,35 @@ export async function setupGitAttributes(projectRoot: string, dryRun?: boolean):
     }
 
     logger.debug('.gitattributes configured with union merge driver for events.jsonl')
+}
+
+/**
+ * Ensures `.gitignore` excludes the derived read model.
+ *
+ * The sibling of `setupGitAttributes`: that one keeps the event log mergeable,
+ * this one keeps the database it derives out of git entirely. Appends the block
+ * if absent, creates the file if needed, and is safe to call repeatedly.
+ */
+export async function setupGitIgnore(projectRoot: string, dryRun?: boolean): Promise<void> {
+    const gitignorePath = path.join(projectRoot, '.gitignore')
+
+    if (dryRun) {
+        logger.info(`[DRY RUN] Would exclude the derived read model in ${gitignorePath}`)
+        return
+    }
+
+    if (await fs.pathExists(gitignorePath)) {
+        const current = await fs.readFile(gitignorePath, 'utf-8')
+        if (current.includes(GITIGNORE_MARKER)) {
+            logger.debug('.gitignore already excludes the read model')
+            return
+        }
+        await fs.appendFile(gitignorePath, GITIGNORE_BLOCK, 'utf-8')
+    } else {
+        await fs.writeFile(gitignorePath, GITIGNORE_BLOCK.trimStart(), 'utf-8')
+    }
+
+    logger.debug('.gitignore configured to exclude the derived read model')
 }
 
 async function makeScriptsExecutable(dryRun?: boolean): Promise<void> {
