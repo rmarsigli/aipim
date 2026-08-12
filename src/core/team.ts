@@ -14,6 +14,8 @@ export interface TeamMember {
 export interface ProjectConfig {
     project: { name: string; description?: string; active_skills?: string[] }
     team: TeamMember[]
+    /** Commands that must pass before a task can be completed. See core/verification.ts. */
+    checks?: { commands?: unknown[] }
 }
 
 export function loadConfig(projectRoot: string): ProjectConfig | null {

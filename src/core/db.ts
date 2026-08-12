@@ -8,7 +8,8 @@ import {
     TaskPriorityChangedEvent,
     TaskCommentAddedEvent,
     TaskCompletedEvent,
-    DecisionLoggedEvent
+    DecisionLoggedEvent,
+    CheckRunEvent
 } from '../types/index.js'
 
 const DB_FILE = '.project/data.db'
@@ -61,6 +62,18 @@ CREATE TABLE IF NOT EXISTS decisions (
     created_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS checks (
+    id          TEXT PRIMARY KEY,
+    task_id     TEXT NOT NULL,
+    command     TEXT NOT NULL,
+    exit_code   INTEGER NOT NULL,
+    passed      INTEGER NOT NULL,
+    duration_ms INTEGER,
+    output      TEXT,
+    actor       TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS events_log (
     id          TEXT PRIMARY KEY,
     type        TEXT NOT NULL,
@@ -72,6 +85,7 @@ CREATE TABLE IF NOT EXISTS events_log (
 CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
+CREATE INDEX IF NOT EXISTS idx_checks_task    ON checks(task_id);
 `
 
 export function openDb(projectRoot: string): Database.Database {
@@ -88,6 +102,7 @@ export function rebuild(projectRoot: string, events: AipimEvent[]): void {
     const db = openDb(projectRoot)
 
     db.exec('DROP TABLE IF EXISTS events_log')
+    db.exec('DROP TABLE IF EXISTS checks')
     db.exec('DROP TABLE IF EXISTS comments')
     db.exec('DROP TABLE IF EXISTS decisions')
     db.exec('DROP TABLE IF EXISTS tasks')
@@ -160,6 +175,23 @@ function handleDecisionLogged(db: Database.Database, event: DecisionLoggedEvent)
     )
 }
 
+function handleCheckRun(db: Database.Database, event: CheckRunEvent): void {
+    db.prepare(
+        `INSERT OR IGNORE INTO checks (id, task_id, command, exit_code, passed, duration_ms, output, actor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+        event.id,
+        event.taskId,
+        event.command,
+        event.exitCode,
+        event.passed ? 1 : 0,
+        event.durationMs ?? null,
+        event.output ?? null,
+        event.actor,
+        event.timestamp
+    )
+}
+
 /**
  * Applies a single event to an already-open database.
  * Used both during rebuild and for incremental updates (append → applyEvent).
@@ -186,6 +218,8 @@ export function applyEvent(db: Database.Database, event: AipimEvent): void {
             return handleTaskCompleted(db, event)
         case 'decision.logged':
             return handleDecisionLogged(db, event)
+        case 'check.run':
+            return handleCheckRun(db, event)
         // Events that don't mutate derived state (content_updated, dependency_*, session_*)
         default:
             break
@@ -269,6 +303,29 @@ export function getBlockers(db: Database.Database): TaskRow[] {
 
 export function getCommentsForTask(db: Database.Database, taskId: string): CommentRow[] {
     return db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at ASC').all(taskId) as CommentRow[]
+}
+
+export interface CheckRow {
+    id: string
+    task_id: string
+    command: string
+    exit_code: number
+    passed: boolean
+    duration_ms: number | null
+    output: string | null
+    actor: string
+    created_at: string
+}
+
+/**
+ * Returns all recorded checks for a task, oldest first.
+ * SQLite has no boolean type, so `passed` is normalised back to a real boolean here.
+ */
+export function getChecksForTask(db: Database.Database, taskId: string): CheckRow[] {
+    const rows = db.prepare('SELECT * FROM checks WHERE task_id = ? ORDER BY created_at ASC').all(taskId) as Array<
+        Omit<CheckRow, 'passed'> & { passed: number }
+    >
+    return rows.map((row) => ({ ...row, passed: row.passed === 1 }))
 }
 
 export function getDecisions(db: Database.Database): DecisionRow[] {

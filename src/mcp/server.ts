@@ -113,7 +113,7 @@ export async function startMcpServer(projectRoot: string, port = 3141): Promise<
             try {
                 const result = await withTimeout(
                     Promise.resolve(tool.handler({ db, projectRoot, events: readEvents(projectRoot) }, toolArgs)),
-                    TOOL_TIMEOUT_MS,
+                    tool.timeoutMs ?? TOOL_TIMEOUT_MS,
                     toolName ?? 'unknown'
                 )
                 return c.json({

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
-import { openDb, rebuild, applyEvent, queryTasks, getNextTask, getTask, getBlockers, getCommentsForTask, getStats } from '../../src/core/db.js'
-import type { AipimEvent, TaskCreatedEvent, TaskStatusChangedEvent, TaskAssignedEvent, TaskCommentAddedEvent, TaskCompletedEvent } from '../../src/types/index.js'
+import { openDb, rebuild, applyEvent, queryTasks, getNextTask, getTask, getBlockers, getCommentsForTask, getStats, getChecksForTask } from '../../src/core/db.js'
+import type { AipimEvent, TaskCreatedEvent, TaskStatusChangedEvent, TaskAssignedEvent, TaskCommentAddedEvent, TaskCompletedEvent, CheckRunEvent } from '../../src/types/index.js'
 
 const TEST_ROOT = join(process.cwd(), 'tests/__fixtures__/db-test')
 
@@ -286,6 +286,84 @@ describe('getStats', () => {
         const stats = getStats(db)
         expect(stats['backlog']).toBe(1)
         expect(stats['in-progress']).toBe(1)
+        db.close()
+    })
+})
+
+describe('check.run events', () => {
+    function makeCheck(overrides: Partial<CheckRunEvent> = {}): CheckRunEvent {
+        return {
+            id: `chk-${Math.random().toString(36).slice(2, 8)}`,
+            type: 'check.run',
+            timestamp: new Date().toISOString(),
+            actor: 'test@example.com',
+            taskId: 'TASK-001',
+            command: 'pnpm test',
+            exitCode: 0,
+            passed: true,
+            ...overrides,
+        }
+    }
+
+    it('creates a checks table on rebuild', () => {
+        rebuild(TEST_ROOT, [])
+        const db = openDb(TEST_ROOT)
+
+        const tables = db
+            .prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
+            .all() as Array<{ name: string }>
+
+        expect(tables.map((t) => t.name)).toContain('checks')
+        db.close()
+    })
+
+    it('stores a recorded check for the task', () => {
+        const events: AipimEvent[] = [makeTask(), makeCheck({ id: 'c1', command: 'pnpm lint' })]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks).toHaveLength(1)
+        expect(checks[0].command).toBe('pnpm lint')
+        expect(checks[0].passed).toBe(true)
+        db.close()
+    })
+
+    it('stores a failed check with passed false', () => {
+        const events: AipimEvent[] = [makeTask(), makeCheck({ id: 'c1', exitCode: 1, passed: false })]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks[0].passed).toBe(false)
+        expect(checks[0].exit_code).toBe(1)
+        db.close()
+    })
+
+    it('returns checks ordered oldest first', () => {
+        const events: AipimEvent[] = [
+            makeTask(),
+            makeCheck({ id: 'c2', timestamp: '2026-01-02T00:00:00.000Z', command: 'second' }),
+            makeCheck({ id: 'c1', timestamp: '2026-01-01T00:00:00.000Z', command: 'first' }),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        const checks = getChecksForTask(db, 'TASK-001')
+        expect(checks.map((c) => c.command)).toEqual(['first', 'second'])
+        db.close()
+    })
+
+    it('does not return checks belonging to another task', () => {
+        const events: AipimEvent[] = [
+            makeTask(),
+            makeTask({ taskId: 'TASK-002', id: 'e2' }),
+            makeCheck({ id: 'c1', taskId: 'TASK-002' }),
+        ]
+        rebuild(TEST_ROOT, events)
+        const db = openDb(TEST_ROOT)
+
+        expect(getChecksForTask(db, 'TASK-001')).toHaveLength(0)
         db.close()
     })
 })

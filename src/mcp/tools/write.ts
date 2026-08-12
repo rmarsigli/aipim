@@ -1,10 +1,61 @@
 import { renameSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join, basename } from 'path'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 import { appendEvent } from '../../core/events.js'
-import { applyEvent, getTask, queryTasks } from '../../core/db.js'
+import { applyEvent, getTask, queryTasks, getChecksForTask } from '../../core/db.js'
 import { getMember } from '../../core/team.js'
+import { getRequiredChecks, evaluateGate, lastActivityAt, explainGate } from '../../core/verification.js'
 import { validatePathSafe } from '../../utils/path-validator.js'
 import type { McpTool, ToolContext } from './index.js'
+
+const execAsync = promisify(exec)
+
+// Tail of command output kept as evidence — enough to diagnose a failure
+// without turning events.jsonl into a log dump.
+const OUTPUT_TAIL_CHARS = 2000
+
+// Check commands are frequently whole test suites, so they get a much longer
+// budget than the default 30s tool timeout.
+const CHECK_TIMEOUT_MS = 300_000
+
+interface CheckResult {
+    command: string
+    exitCode: number
+    passed: boolean
+    durationMs: number
+    output: string
+}
+
+/**
+ * Runs a single check command in the project root and captures its outcome.
+ *
+ * Commands come from the project's own config.toml, which carries the same
+ * trust level as its package.json scripts — this is not a sandbox boundary.
+ */
+async function runCheck(command: string, projectRoot: string): Promise<CheckResult> {
+    const startedAt = Date.now()
+    try {
+        const { stdout, stderr } = await execAsync(command, { cwd: projectRoot, timeout: CHECK_TIMEOUT_MS })
+        return {
+            command,
+            exitCode: 0,
+            passed: true,
+            durationMs: Date.now() - startedAt,
+            output: (stdout + stderr).slice(-OUTPUT_TAIL_CHARS)
+        }
+    } catch (err) {
+        const e = err as { code?: number; stdout?: string; stderr?: string; message?: string }
+        const output = (e.stdout ?? '') + (e.stderr ?? '') || (e.message ?? '')
+        return {
+            command,
+            exitCode: typeof e.code === 'number' ? e.code : 1,
+            passed: false,
+            durationMs: Date.now() - startedAt,
+            output: output.slice(-OUTPUT_TAIL_CHARS)
+        }
+    }
+}
 
 function nextTaskId(ctx: ToolContext): string {
     const tasks = queryTasks(ctx.db)
@@ -65,25 +116,101 @@ ${description ? `\n${description}\n` : ''}
 export const writeTools: McpTool[] = [
     {
         schema: {
+            name: 'verify_task',
+            description:
+                'Run the project verification checks for a task and record the result as evidence in the event log. Required before complete_task when [checks] is configured in config.toml.',
+            inputSchema: {
+                type: 'object',
+                required: ['taskId'],
+                properties: {
+                    taskId: { type: 'string' },
+                    commands: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Override the configured commands. Use sparingly — the config is the contract.'
+                    }
+                }
+            }
+        },
+        timeoutMs: CHECK_TIMEOUT_MS,
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
+            const taskId = args.taskId as string
+            if (!getTask(db, taskId)) throw new Error(`Task ${taskId} not found`)
+
+            const override = Array.isArray(args.commands)
+                ? (args.commands as unknown[]).filter((c): c is string => typeof c === 'string')
+                : null
+            const commands = override ?? getRequiredChecks(projectRoot)
+
+            if (commands.length === 0) {
+                return {
+                    taskId,
+                    results: [],
+                    allPassed: true,
+                    message: 'No checks configured. Add [checks] commands to .project/config.toml to enable the gate.'
+                }
+            }
+
+            const results: CheckResult[] = []
+            // Every command runs, even after a failure — one report beats one bisect.
+            for (const command of commands) {
+                const result = await runCheck(command, projectRoot)
+                results.push(result)
+
+                const event = await appendEvent(projectRoot, {
+                    type: 'check.run',
+                    taskId,
+                    command: result.command,
+                    exitCode: result.exitCode,
+                    passed: result.passed,
+                    durationMs: result.durationMs,
+                    output: result.output
+                })
+                applyEvent(db, event)
+            }
+
+            return {
+                taskId,
+                results: results.map(({ output, ...rest }) => ({ ...rest, output: output.slice(-500) })),
+                allPassed: results.every((r) => r.passed)
+            }
+        }
+    },
+
+    {
+        schema: {
             name: 'complete_task',
-            description: 'Mark a task as done. Moves the .md file to completed/ and logs the event.',
+            description:
+                'Mark a task as done. Moves the .md file to completed/ and logs the event. Rejected unless the configured verification checks passed after the task last changed — run verify_task first.',
             inputSchema: {
                 type: 'object',
                 required: ['taskId'],
                 properties: {
                     taskId: { type: 'string' },
                     notes: { type: 'string' },
-                    actualHours: { type: 'number' }
+                    actualHours: { type: 'number' },
+                    force: {
+                        type: 'boolean',
+                        description: 'Bypass the verification gate. The bypass is recorded in the event log.'
+                    }
                 }
             }
         },
-        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
+        handler: async ({ db, projectRoot, events }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
             const taskId = args.taskId as string
             const notes = args.notes as string | undefined
             const actualHours = args.actualHours as number | undefined
+            const force = args.force === true
 
             const task = getTask(db, taskId)
             if (!task) throw new Error(`Task ${taskId} not found`)
+
+            const required = getRequiredChecks(projectRoot)
+            if (required.length > 0 && !force) {
+                const gate = evaluateGate(required, getChecksForTask(db, taskId), lastActivityAt(events, taskId))
+                if (!gate.satisfied) throw new Error(explainGate(taskId, gate))
+            }
+            const checksBypassed = force && required.length > 0
 
             let fileMoved: string | null = null
             if (task.file_path) {
@@ -101,10 +228,16 @@ export const writeTools: McpTool[] = [
                 }
             }
 
-            const event = await appendEvent(projectRoot, { type: 'task.completed', taskId, notes, actualHours })
+            const event = await appendEvent(projectRoot, {
+                type: 'task.completed',
+                taskId,
+                notes,
+                actualHours,
+                ...(checksBypassed ? { checksBypassed: true } : {})
+            })
             applyEvent(db, event)
 
-            return { success: true, taskId, completedAt: event.timestamp, fileMoved }
+            return { success: true, taskId, completedAt: event.timestamp, fileMoved, checksBypassed }
         }
     },
 
