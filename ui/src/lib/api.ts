@@ -52,6 +52,53 @@ export interface EventsPage {
     offset: number
 }
 
+export interface DiscoverySession {
+    id: string
+    topic: string
+    status: string
+    started_at: string
+    updated_at: string
+    actor: string
+}
+
+export interface DiscoveryState {
+    problem: string
+    agreements: Array<{ statement: string; rationale: string }>
+    alternatives: Array<{ option: string; rejectedBecause: string }>
+    assumptions: Array<{ question: string; assumed: string; critical: boolean }>
+    grounding: Array<{ kind: string; id: string; relation: string; note?: string }>
+    openThreads: string[]
+}
+
+export interface Changeset {
+    tasks: Array<{
+        localId: string
+        title: string
+        taskType: string
+        priority: string
+        estimatedHours?: number
+        description?: string
+    }>
+    dependencies: Array<{ taskRef: string; dependsOnRef: string }>
+    decisions: Array<{ title: string; rationale: string; supersedes?: string[] }>
+    docs: Array<{ path: string; content: string }>
+}
+
+export interface ProposedChangeset {
+    id: string
+    status: string
+    proposedAt: string
+    resolvedAt: string | null
+    changeset: Changeset
+}
+
+export interface DiscoveryDetail extends DiscoverySession {
+    version: number
+    state: DiscoveryState
+    history: Array<{ version: number; createdAt: string }>
+    changesets: ProposedChangeset[]
+}
+
 export type Stats = Record<string, number>
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -87,6 +134,14 @@ export function getDecisions(): Promise<Decision[]> {
 
 export function getDecision(id: string): Promise<Decision & { content: string | null }> {
     return apiFetch<Decision & { content: string | null }>(`/api/decisions/${id}`)
+}
+
+export function getDiscoveries(status?: string): Promise<DiscoverySession[]> {
+    return apiFetch<DiscoverySession[]>(`/api/discoveries${status ? `?status=${status}` : ''}`)
+}
+
+export function getDiscovery(id: string): Promise<DiscoveryDetail> {
+    return apiFetch<DiscoveryDetail>(`/api/discoveries/${id}`)
 }
 
 export function getEvents(opts?: { limit?: number; offset?: number }): Promise<EventsPage> {

@@ -5,6 +5,8 @@ import { Hono } from 'hono'
 import { openDb, rebuild, applyEvent, getTask } from '../../src/core/db.js'
 import { registerApiRoutes } from '../../src/mcp/api.js'
 import type { TaskCreatedEvent } from '../../src/types/index.js'
+import { startDiscovery, recordDiscoveryState } from '../../src/core/discovery.js'
+import { proposeChangeset } from '../../src/core/changeset.js'
 import Database from 'better-sqlite3'
 
 const TEST_ROOT = join(process.cwd(), 'tests/__fixtures__/api-test')
@@ -347,5 +349,75 @@ describe('GET /api/graph', () => {
 
         expect(body.ready).toEqual(['TASK-001'])
         expect(body.blocked).toEqual(['TASK-002'])
+    })
+})
+
+// ─── GET /api/discoveries ────────────────────────────────────────────────────
+
+describe('GET /api/discoveries', () => {
+    it('returns empty array when no session exists', async () => {
+        const res = await buildApp(db).request('/api/discoveries')
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual([])
+    })
+
+    it('lists sessions most recently touched first', async () => {
+        const first = await startDiscovery(TEST_ROOT, db, 'older')
+        await startDiscovery(TEST_ROOT, db, 'newer')
+        await recordDiscoveryState(TEST_ROOT, db, first.sessionId, { problem: 'touched last' })
+
+        const res = await buildApp(db).request('/api/discoveries')
+        const sessions = (await res.json()) as Array<{ id: string; topic: string }>
+
+        expect(sessions.map((s) => s.id)).toEqual(['D001', 'D002'])
+        expect(sessions[0].topic).toBe('older')
+    })
+
+    it('filters by status', async () => {
+        await startDiscovery(TEST_ROOT, db, 'still open')
+
+        const res = await buildApp(db).request('/api/discoveries?status=applied')
+        expect(await res.json()).toEqual([])
+    })
+})
+
+// ─── GET /api/discoveries/:id ────────────────────────────────────────────────
+
+describe('GET /api/discoveries/:id', () => {
+    it('returns 404 for an unknown session', async () => {
+        const res = await buildApp(db).request('/api/discoveries/D999')
+        expect(res.status).toBe(404)
+    })
+
+    it('returns the distilled state with its version history', async () => {
+        const { sessionId } = await startDiscovery(TEST_ROOT, db, 'the session')
+        await recordDiscoveryState(TEST_ROOT, db, sessionId, { problem: 'v1' })
+        await recordDiscoveryState(TEST_ROOT, db, sessionId, {
+            problem: 'v2',
+            alternatives: [{ option: 'granular events', rejectedBecause: 'no query needs them' }]
+        })
+
+        const res = await buildApp(db).request(`/api/discoveries/${sessionId}`)
+        const body = (await res.json()) as Record<string, any>
+
+        expect(body.topic).toBe('the session')
+        expect(body.version).toBe(2)
+        expect(body.state.problem).toBe('v2')
+        expect(body.state.alternatives).toHaveLength(1)
+        expect(body.history.map((h: { version: number }) => h.version)).toEqual([1, 2])
+    })
+
+    it('includes the proposed changeset', async () => {
+        const { sessionId } = await startDiscovery(TEST_ROOT, db, 'with a proposal')
+        await proposeChangeset(TEST_ROOT, db, sessionId, {
+            tasks: [{ localId: '#1', title: 'Build', taskType: 'feat', priority: 'P2-M', estimatedHours: 4 }]
+        })
+
+        const res = await buildApp(db).request(`/api/discoveries/${sessionId}`)
+        const body = (await res.json()) as Record<string, any>
+
+        expect(body.changesets).toHaveLength(1)
+        expect(body.changesets[0].status).toBe('proposed')
+        expect(body.changesets[0].changeset.tasks[0].title).toBe('Build')
     })
 })

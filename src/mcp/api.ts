@@ -5,9 +5,21 @@ import { EventEmitter } from 'events'
 import { writeFileSync } from 'fs'
 import { existsSync } from 'fs'
 import Database from 'better-sqlite3'
-import { queryTasks, getTask, getCommentsForTask, getDecisions, getStats, applyEvent } from '../core/db.js'
+import {
+    queryTasks,
+    getTask,
+    getCommentsForTask,
+    getDecisions,
+    getStats,
+    applyEvent,
+    queryDiscoverySessions,
+    getDiscoveryStates,
+    getChangesetsForSession
+} from '../core/db.js'
 import { appendEvent, readEvents, readEventsForTask } from '../core/events.js'
 import { loadTaskGraph } from '../core/graph.js'
+import { loadDiscovery } from '../core/discovery.js'
+import { parseChangeset } from '../core/changeset.js'
 import { loadConfig } from '../core/team.js'
 import { validatePath, SecurityError } from '../utils/path-validator.js'
 import { AipimEvent, EVENT_TYPES } from '../types/index.js'
@@ -149,6 +161,38 @@ export function registerApiRoutes(app: Hono, db: Database.Database, projectRoot:
         if (!decision) return c.json({ error: 'Not found' }, 404)
         const content = readFileSafe(projectRoot, decision.file_path)
         return c.json({ ...decision, content })
+    })
+
+    // GET /api/discoveries — brainstorm sessions, most recently touched first
+    app.get('/api/discoveries', (c) => {
+        const status = c.req.query('status')
+        return c.json(queryDiscoverySessions(db, status ? { status } : undefined))
+    })
+
+    // GET /api/discoveries/:id — session with its distilled state and proposals
+    app.get('/api/discoveries/:id', (c) => {
+        const sessionId = c.req.param('id')
+        const loaded = loadDiscovery(db, sessionId)
+        if (!loaded) return c.json({ error: 'Not found' }, 404)
+
+        const changesets = getChangesetsForSession(db, sessionId).map((row) => ({
+            id: row.id,
+            status: row.status,
+            proposedAt: row.proposed_at,
+            resolvedAt: row.resolved_at,
+            changeset: parseChangeset(row)
+        }))
+
+        return c.json({
+            ...loaded.session,
+            version: loaded.version,
+            state: loaded.state,
+            history: getDiscoveryStates(db, sessionId).map((row) => ({
+                version: row.version,
+                createdAt: row.created_at
+            })),
+            changesets
+        })
     })
 
     // GET /api/tasks/:id/events — events related to a specific task

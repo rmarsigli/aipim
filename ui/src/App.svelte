@@ -6,7 +6,9 @@
     import TaskView from './routes/Task.svelte'
     import Decisions from './routes/Decisions.svelte'
     import DecisionView from './routes/Decision.svelte'
-    import { LayoutDashboard, Columns, Activity, BookOpen } from 'lucide-svelte'
+    import Discoveries from './routes/Discoveries.svelte'
+    import DiscoveryView from './routes/Discovery.svelte'
+    import { LayoutDashboard, Columns, Activity, BookOpen, Lightbulb } from 'lucide-svelte'
 
     let route = $state(getPath())
 
@@ -20,12 +22,14 @@
 
     const taskId = $derived(route.startsWith('/task/') ? route.slice('/task/'.length) : null)
     const decisionId = $derived(route.startsWith('/decision/') ? route.slice('/decision/'.length) : null)
+    const discoveryId = $derived(route.startsWith('/discovery/') ? route.slice('/discovery/'.length) : null)
 
     const navLinks = [
         { path: '/', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/kanban', label: 'Kanban', icon: Columns },
         { path: '/timeline', label: 'Timeline', icon: Activity },
         { path: '/decisions', label: 'Decisions', icon: BookOpen },
+        { path: '/discovery', label: 'Discovery', icon: Lightbulb },
     ]
 
     function isActive(path: string): boolean {
@@ -66,12 +70,16 @@
             <TaskView id={taskId} />
         {:else if decisionId}
             <DecisionView id={decisionId} />
+        {:else if discoveryId}
+            <DiscoveryView id={discoveryId} />
         {:else if route === '/kanban'}
             <Kanban />
         {:else if route === '/timeline'}
             <Timeline />
         {:else if route === '/decisions'}
             <Decisions />
+        {:else if route === '/discovery'}
+            <Discoveries />
         {:else}
             <Dashboard />
         {/if}
