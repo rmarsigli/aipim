@@ -22,7 +22,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      # build:release also builds the Svelte UI into ui/dist, which `files` ships
+      - run: pnpm run build:release
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
