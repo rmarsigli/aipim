@@ -126,9 +126,13 @@ In production (`aipim ui`), static files from `ui/dist/` are served by Hono at `
 ### `aipim task`
 
 ```bash
-aipim task next              # show highest-priority backlog task
+aipim task next              # show the next startable task
 aipim task init <type> <name>  # create a new task file
 ```
+
+`task next` resolves from the event log and shares `getNextReadyTask` with the MCP
+`get_next_task` tool, so the CLI and an agent always agree — and neither returns a task
+that is still blocked.
 
 Priority order: `P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3`, oldest first on tie.
 
@@ -144,8 +148,8 @@ aipim deps
 Task Dependency Graph
 
 Ready to start:
-  TASK-032: Unify aipim task next with the event-sourced ready frontier
   TASK-033: Add a dependency graph view to the Svelte UI
+  TASK-035: Derive productivity metrics from the event log
 
 Blocked:
   TASK-036: Slim CLAUDE.md down to what the harness cannot enforce
@@ -412,7 +416,7 @@ AIPIM also writes `.claude/settings.json` at the project root when Claude Code h
 ## Development
 
 ```bash
-pnpm test           # 353 tests
+pnpm test           # 358 tests
 pnpm lint           # eslint + prettier
 pnpm build          # tsup → dist/
 pnpm type-check

@@ -39,9 +39,15 @@ The event log stops being only a record and starts being the mechanism that enfo
 - Merging preserves user-authored hooks and replaces only AIPIM's own entries (tagged `aipim-managed`) — repeated installs are idempotent.
 - A `settings.json` that cannot be parsed is left untouched rather than overwritten.
 
+### Fixed
+
+- `aipim task next` resolved the next task by parsing `.project/backlog/*.md` frontmatter, which meant the CLI and the MCP `get_next_task` tool could disagree — the CLI happily returned a task blocked by unfinished work. Both now share `getNextReadyTask` over the event log. The command also reports how many tasks are ready, how many are blocked, and any cycles.
+- `complete_task` stacked a second date on the archived filename when the backlog file already carried one (`completed/2026-08-12-2026-08-12-TASK-001-name.md`). The existing date is now replaced, so archived files stay dated by completion.
+
 ### Removed
 
 - `src/utils/dependencies.ts` — the 1.x markdown-based graph, which used a hand-rolled frontmatter parser and fuzzy ID matching (`key.includes(id)` matched `TASK-1` against `TASK-10`). Replaced by `core/graph.ts`.
+- `resolveNextTask(files, backlogDir)` markdown parsing in `src/commands/task.ts`, replaced by an event-sourced `resolveNextTask(projectRoot)`.
 
 ### Changed
 

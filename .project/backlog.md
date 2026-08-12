@@ -15,6 +15,7 @@
 | Gate de verificação | `check.run` events, `verify_task`, `complete_task` recusado sem evidência verde |
 | Grafo de dependências | tabela `task_dependencies`, `add_dependency`/`remove_dependency`/`get_task_graph`, fronteira pronta em `get_next_task`, ciclos rejeitados |
 | Hooks | `SessionStart` injeta estado, `Stop` checa trabalho não verificado, `aipim hook install` |
+| CLI unificado | `aipim task next` derivado do event log, compartilhando `getNextReadyTask` com o MCP (TASK-032) |
 
 ---
 
@@ -22,7 +23,6 @@
 
 | ID | Type | Task | Status | Priority | Est. |
 |---|---|---|---|---|---|
-| TASK-032 | refactor | Unificar `aipim task next` com a fronteira pronta | backlog | P1-S | 2h |
 | TASK-033 | feat | View de grafo de dependências na UI | backlog | P2-M | 6h |
 | TASK-034 | feat | Evidência de verificação na timeline e no detalhe da task | backlog | P2-M | 4h |
 | TASK-035 | feat | Métricas derivadas do event log (`get_metrics`) | backlog | P2-M | 6h |
@@ -38,7 +38,7 @@
 TASK-035 (métricas)
   └── TASK-036 (enxugar CLAUDE.md — precisa do get_metrics para substituir a seção de métricas)
 
-TASK-032, TASK-033, TASK-034, TASK-037 — independentes, podem ir em paralelo
+TASK-033, TASK-034, TASK-037 — independentes, podem ir em paralelo
 ```
 
 Fonte de verdade: `events.jsonl`. Rode `aipim deps` para o grafo atual.
