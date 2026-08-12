@@ -1,6 +1,11 @@
 [project]
-name = "My Project"
-description = "Project description"
+name = "AIPIM"
+description = "Artificial Intelligence Project Instruction Manager"
+
+# Dogfooding the 2.2 verification gate: complete_task is refused unless these
+# passed after the task last changed. Run verify_task to record the evidence.
+[checks]
+commands = ["pnpm test", "pnpm lint", "pnpm type-check"]
 
 # Add team members below (optional — works as solo dev without this)
 # [[team]]
