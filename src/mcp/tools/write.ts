@@ -87,6 +87,17 @@ function today(): string {
     return new Date().toISOString().split('T')[0]
 }
 
+/**
+ * Builds the archive filename for a completed task.
+ *
+ * Archived files are dated by completion, so any date the backlog file already
+ * carries (its creation date) is replaced rather than prefixed — otherwise the
+ * name ends up with two stacked dates.
+ */
+function completedFilename(filePath: string): string {
+    return `${today()}-${basename(filePath).replace(/^\d{4}-\d{2}-\d{2}-/, '')}`
+}
+
 function adrMarkdown(title: string, rationale: string, taskId?: string): string {
     const taskLine = taskId ? `taskId: ${taskId}\n` : ''
     return `---
@@ -222,7 +233,7 @@ export const writeTools: McpTool[] = [
 
             let fileMoved: string | null = null
             if (task.file_path) {
-                const dest = `.project/completed/${today()}-${basename(task.file_path)}`
+                const dest = `.project/completed/${completedFilename(task.file_path)}`
                 const srcFull = join(projectRoot, task.file_path)
                 const destFull = join(projectRoot, dest)
                 mkdirSync(join(projectRoot, '.project/completed'), { recursive: true })

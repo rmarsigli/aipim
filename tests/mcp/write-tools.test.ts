@@ -541,3 +541,39 @@ describe('remove_dependency', () => {
         await expect(tool.handler(ctx, { taskId: 'TASK-002', dependsOn: 'TASK-001' })).rejects.toThrow('No dependency')
     })
 })
+
+describe('complete_task destination filename', () => {
+    const tool = makeTool('complete_task')
+
+    it('does not stack a second date prefix on an already dated file', async () => {
+        const filePath = '.project/backlog/2026-01-15-TASK-001-already-dated.md'
+        writeFileSync(join(TEST_ROOT, filePath), '# Task')
+        seedTask(db, 'TASK-001', { filePath })
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.fileMoved).not.toMatch(/\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}/)
+        expect(result.fileMoved).toMatch(/^\.project\/completed\/\d{4}-\d{2}-\d{2}-TASK-001-already-dated\.md$/)
+    })
+
+    it('dates the archived file by completion, not by creation', async () => {
+        const filePath = '.project/backlog/2020-01-15-TASK-001-old.md'
+        writeFileSync(join(TEST_ROOT, filePath), '# Task')
+        seedTask(db, 'TASK-001', { filePath })
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.fileMoved).not.toContain('2020-01-15')
+        expect(existsSync(join(TEST_ROOT, result.fileMoved as string))).toBe(true)
+    })
+
+    it('adds a date prefix to a file that has none', async () => {
+        const filePath = '.project/backlog/TASK-001-undated.md'
+        writeFileSync(join(TEST_ROOT, filePath), '# Task')
+        seedTask(db, 'TASK-001', { filePath })
+
+        const result = (await tool.handler(ctx, { taskId: 'TASK-001' })) as Record<string, unknown>
+
+        expect(result.fileMoved).toMatch(/^\.project\/completed\/\d{4}-\d{2}-\d{2}-TASK-001-undated\.md$/)
+    })
+})
