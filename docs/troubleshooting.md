@@ -86,6 +86,69 @@ cat .project/events.jsonl | wc -l
 
 ---
 
+## complete_task is refused
+
+```
+Cannot complete TASK-042 — verification gate not satisfied
+(never run: pnpm lint; stale (ran before the last change): pnpm test).
+```
+
+Working as designed: `[checks] commands` is set in `.project/config.toml` and the evidence is
+missing or out of date. Call `verify_task` for that task, then complete it.
+
+- **never run** — the command has no recorded result for this task
+- **stale** — it passed, but before the task last changed, so it did not see the current work
+- **failing** — the most recent run did not pass. Fix the work, not the gate
+
+If the checks genuinely do not apply, pass `force: true`. The task completes and the event
+records `checksBypassed: true`. If you want the gate gone entirely, remove the `[checks]`
+section — with nothing declared it is a no-op.
+
+## verify_task times out
+
+Tool handlers get 30s by default; `verify_task` gets 300s because check commands are often
+whole test suites. A suite slower than that needs to be split, or narrowed in `[checks]` to a
+faster subset (a smoke suite in the gate, the full run in CI).
+
+## Hooks are not firing
+
+Check that they are registered:
+
+```bash
+cat .claude/settings.json
+```
+
+You should see `aipim hook session-start` and `aipim hook stop`. If not, run
+`aipim hook install`.
+
+If they are registered and still nothing happens, the likely cause is `aipim` not being on
+`PATH` for the shell Claude Code spawns — the hook commands are invoked by name. Verify with
+`which aipim`.
+
+The hooks fail silently by design: a broken hook must never break the session it is attached
+to. Run `aipim hook session-start` by hand to see the real error.
+
+## The Stop hook never blocks anything
+
+Blocking is opt-in. Add to `.project/config.toml`:
+
+```toml
+[hooks]
+block_on_unverified = true
+```
+
+It also stays silent when the project has no `[checks]` configured — there is nothing to
+verify against.
+
+## aipim ui shows 404
+
+The server only mounts `/ui/*` when `ui/dist/` exists. Versions 2.1.0 through 2.3.0 published
+without it: `files` declared the directory but the release build never produced it. Upgrade
+to 2.3.1 or later.
+
+Building from source, run `pnpm run build:release` rather than `pnpm run build` — the latter
+builds only the CLI.
+
 ## validate reports missing scripts
 
 Scripts must be executable:

@@ -59,6 +59,85 @@ curl -X POST http://localhost:3141/api/events \
   -d '{"type":"task.comment_added","taskId":"TASK-001","text":"Found root cause."}'
 ```
 
+## Task dependencies and the ready frontier
+
+Dependencies are events, not frontmatter. Declare one and the dependent task drops out of
+the ready frontier until its blocker is done:
+
+```
+add_dependency(taskId: "TASK-036", dependsOn: "TASK-035")
+```
+
+From then on `get_next_task` and `aipim task next` skip TASK-036 until TASK-035 completes.
+`get_task_graph` (or `GET /api/graph`) returns the whole picture: every node with both edge
+directions, which dependencies are blocking it, the ready set, the blocked set and any
+cycles.
+
+An edge that would close a loop is rejected when you create it, not discovered later:
+
+```
+Cannot add TASK-035 → TASK-036: it would create a dependency cycle.
+Call get_task_graph to inspect the current edges.
+```
+
+A dependency pointing at a task that does not exist counts as blocking. An unknown
+prerequisite is not a satisfied one.
+
+Coming from 1.x, `depends_on:` frontmatter is converted into dependency events by
+`aipim migrate`, including the short `T001` form. Edges pointing at tasks that were never
+migrated are dropped rather than left as permanent blockers.
+
+## Verification evidence
+
+Every `verify_task` run appends one `check.run` event per command, carrying the command,
+exit code, pass/fail, duration and a truncated tail of the output. Nothing else in the log
+is overwritten, so the history of what passed and when is complete.
+
+Because evidence is timestamped against the task's own history, a check that ran before the
+last change is reported as stale rather than accepted:
+
+```
+Cannot complete TASK-042 — verification gate not satisfied
+(never run: pnpm lint; stale (ran before the last change): pnpm test).
+```
+
+Recording evidence does not itself count as a change, so a check never invalidates itself.
+
+Query the evidence directly if you want it outside the agent loop:
+
+```bash
+sqlite3 .project/data.db \
+  "SELECT task_id, command, passed, created_at FROM checks ORDER BY created_at DESC LIMIT 10"
+```
+
+Remember that `data.db` is derived — it is rebuilt from `events.jsonl` on every server start.
+
+> Check commands run with the same trust level as your `package.json` scripts. They come
+> from your own `config.toml`. This is not a sandbox boundary.
+
+## Claude Code hooks
+
+`aipim hook install` registers two hooks in `.claude/settings.json`:
+
+| Hook | Effect |
+|------|--------|
+| `SessionStart` | Injects current project state before your first message |
+| `Stop` | Checks that in-progress work has been verified before the agent finishes |
+
+The `Stop` hook only observes by default. To make it hold the line:
+
+```toml
+[hooks]
+block_on_unverified = true
+```
+
+The agent is then prevented from ending its turn while an in-progress task still has failing
+or missing checks, and told which task and why. It is opt-in because a hook that fights you
+is worse than one that does nothing.
+
+Hooks apply to Claude Code only. Gemini and Cursor still rely on the guidelines in their
+prompt files.
+
 ## Helper scripts
 
 ```bash

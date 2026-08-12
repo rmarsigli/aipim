@@ -18,7 +18,13 @@ That's it. Claude Code now calls AIPIM tools directly.
 
 ### Starting a session
 
-Ask Claude Code: _"What's the next task?"_ — it will call `get_next_task` and `get_project_context`.
+If you installed the Claude Code hooks, you do not have to ask for anything: the
+`SessionStart` hook injects the current state — task in progress, next ready task, what is
+blocked, which checks are required — before your first message.
+
+Otherwise ask: _"What's the next task?"_ — it will call `get_next_task` and
+`get_project_context`. `get_next_task` only ever returns work that can actually start; a
+task waiting on an unfinished dependency is skipped, however high its priority.
 
 Or check yourself:
 
@@ -34,9 +40,33 @@ Claude Code writes all state via MCP tools:
 - **Notes/findings** → `add_comment`
 - **Architecture choices** → `log_decision`
 - **New work discovered** → `create_task`
+- **This task waits on another** → `add_dependency`
+- **Work finished** → `verify_task` (runs your checks, records the evidence)
 - **Done** → `complete_task` (moves `.md` to `completed/`, appends event)
 
 You never need to edit `events.jsonl` or the SQLite database manually.
+
+### Making "done" mean something
+
+By default `complete_task` takes the agent at its word. Declare what done requires and it
+stops doing that:
+
+```toml
+# .project/config.toml
+[checks]
+commands = ["npm test", "npm run lint"]
+```
+
+Now `complete_task` is refused unless every command has a passing run recorded *after the
+task last changed* — stale evidence does not count. `verify_task` runs them and records a
+`check.run` event each, so the proof lives in the log next to everything else.
+
+For a task where the checks genuinely do not apply, `complete_task` accepts `force: true`.
+It completes, and writes `checksBypassed: true` into the event. Allowed, never invisible.
+
+Leave `[checks]` out and nothing changes — the gate simply does not exist.
+
+See [advanced-usage.md](advanced-usage.md) for dependencies, the ready frontier and hooks.
 
 ### Updating context.md
 
