@@ -14,9 +14,15 @@
 
 ## What it is
 
-AIPIM 2.x is a project manager built around an **append-only event log**. All state (tasks, comments, decisions, assignments) derives from `events.jsonl`. A SQLite database is rebuilt from those events at startup and used as a fast read model.
+AIPIM is a project manager built around an **append-only event log**. All state (tasks, comments, decisions, dependencies, verification evidence) derives from `events.jsonl`. A SQLite database is rebuilt from those events at startup and used as a fast read model.
 
 An **MCP server** (Model Context Protocol) exposes tools that Claude Code calls directly — no copy-paste, no clipboard workflow. A **REST API** serves the same data for the Svelte UI.
+
+Since 2.2 the log is not only a record of what happened — it is what enforces the process:
+
+- A **verification gate** refuses to mark a task done until the project's checks have actually passed against the current state of the work.
+- A **task graph** decides what can start now, so an agent is never handed work that is still blocked.
+- **Claude Code hooks** run the session protocol instead of asking the model to remember it.
 
 ## Architecture
 
@@ -27,10 +33,13 @@ events.jsonl  ──rebuild──▶  SQLite (read model)
                     ▼                            ▼
               MCP server                    REST API
            (Claude Code)          (/api/* + /ui/* + SSE)
-                                            │
-                                       Svelte UI
-                                  (Kanban · Timeline
-                                   Task detail · Stats)
+                │                           │
+                │                      Svelte UI
+        ┌───────┴────────┐          (Kanban · Timeline
+        ▼                ▼           Task detail · Stats)
+  verification       task graph
+      gate        (ready frontier,
+  (check.run)      cycles, blockers)
 ```
 
 All writes go through `appendEvent() → applyEvent()`. The database is never written to directly.
@@ -68,7 +77,7 @@ aipim migrate   # reads backlog/*.md and completed/*.md → events.jsonl + SQLit
 
 ### `aipim install`
 
-Scaffolds `.project/` in the current directory. Generates `CLAUDE.md` (or `GEMINI.md`, `CURSOR.md`) from templates. Configures `.gitattributes` for union merge on `events.jsonl`.
+Scaffolds `.project/` in the current directory. Generates `CLAUDE.md` (or `GEMINI.md`, `CURSOR.md`) from templates. Configures `.gitattributes` for union merge on `events.jsonl`. When `claude-code` is among the selected AIs, registers AIPIM's hooks in `.claude/settings.json`.
 
 ```bash
 aipim install [--ai claude-code|gemini|cursor] [--guidelines react|astro|...] [--dry-run]
@@ -92,6 +101,7 @@ Endpoints:
 - `GET /api/events` — paginated history (`limit` max 500, `offset`)
 - `GET /api/events/stream` — SSE real-time feed
 - `GET /api/stats` — task counts by status
+- `GET /api/graph` — dependency graph: nodes, edges, ready frontier, blocked set, cycles
 - `GET /api/team` — team members from `config.toml`
 - `GET /api/decisions` — ADRs
 - `GET /ui/*` — Svelte UI (served from `ui/dist/` when built)
@@ -121,6 +131,38 @@ aipim task init <type> <name>  # create a new task file
 ```
 
 Priority order: `P1-S > P1-M > P1-L > P2-S > P2-M > P2-L > P3`, oldest first on tie.
+
+### `aipim deps`
+
+Prints the task dependency graph, derived from the event log: what is in progress, what is ready to start, what is blocked and by what, and any dependency cycles.
+
+```bash
+aipim deps
+```
+
+```
+Task Dependency Graph
+
+Ready to start:
+  TASK-032: Unify aipim task next with the event-sourced ready frontier
+  TASK-033: Add a dependency graph view to the Svelte UI
+
+Blocked:
+  TASK-036: Slim CLAUDE.md down to what the harness cannot enforce
+     └─> waiting on TASK-035 [backlog]
+```
+
+### `aipim hook`
+
+Entry points invoked by Claude Code, plus the installer for them.
+
+```bash
+aipim hook install         # register hooks in .claude/settings.json
+aipim hook session-start   # emit current project state as session context
+aipim hook stop            # check that in-progress work has been verified
+```
+
+`session-start` and `stop` are meant to be run by the harness, not by hand. See [Hooks](#hooks).
 
 ### `aipim team`
 
@@ -193,6 +235,78 @@ Updates scaffolded files (templates, scripts) without overwriting customizations
 
 Checks directory structure, script permissions, and file signatures.
 
+## Verification Gate
+
+Declare what "done" requires, and AIPIM enforces it:
+
+```toml
+# .project/config.toml
+[checks]
+commands = ["pnpm test", "pnpm lint", "pnpm type-check"]
+```
+
+With this set, `complete_task` is **rejected** unless every command has a passing run recorded *after the task last changed*:
+
+```
+Cannot complete TASK-042 — verification gate not satisfied
+(never run: pnpm lint; stale (ran before the last change): pnpm test).
+Run verify_task first, or pass force: true to complete anyway
+(the bypass is recorded in the event log).
+```
+
+`verify_task` runs the commands and records one `check.run` event each — command, exit code, pass/fail, duration and an output tail. That evidence lives in `events.jsonl` alongside everything else, so "this task was verified" is a fact you can audit, not a claim.
+
+Freshness is measured against the work, not the clock: a check that ran before the task's last change is stale. Recording evidence does not itself count as a change, so a check never invalidates itself.
+
+**Escape hatch:** `complete_task` accepts `force: true`, which completes the task and writes `checksBypassed: true` into the event. The bypass is allowed but never invisible.
+
+**No `[checks]` configured?** The gate is a no-op and nothing changes.
+
+> Check commands run with the same trust level as your `package.json` scripts. This is not a sandbox boundary.
+
+## Task Graph
+
+Dependencies are real state, derived from `task.dependency_added` / `task.dependency_removed` events:
+
+```
+add_dependency(taskId: "TASK-036", dependsOn: "TASK-035")
+```
+
+What this buys you:
+
+- **`get_next_task` returns only startable work.** A task whose dependencies are unfinished is never handed to an agent, no matter how high its priority. When nothing is ready, the tool says so and names what is blocking.
+- **The ready frontier is explicit.** `get_task_graph` returns every node with both edge directions, which dependencies are blocking it, the ready set, the blocked set, and any cycles — the basis for deciding what can run in parallel.
+- **Cycles are rejected at write time.** `add_dependency` refuses an edge that would close a loop, and reports the existing edges so you can see why.
+- **An unknown dependency blocks.** A dependency on a task that does not exist counts as unsatisfied rather than being silently ignored.
+
+Migrating from 1.x, `depends_on:` frontmatter is converted into dependency events automatically, including the short `T001` form.
+
+## Hooks
+
+AIPIM registers two Claude Code hooks so the session protocol is executed by the harness instead of living as prose the model has to remember:
+
+| Hook | Command | What it does |
+|------|---------|--------------|
+| `SessionStart` | `aipim hook session-start` | Injects current state: task in progress, next ready task, blocked set, cycles, required checks |
+| `Stop` | `aipim hook stop` | Checks that in-progress work has been verified before the agent finishes |
+
+`aipim install` writes these when `claude-code` is selected. For an existing project:
+
+```bash
+aipim hook install
+```
+
+Merging preserves hooks you wrote yourself and replaces only AIPIM's own entries (tagged `aipim-managed`), so re-running is idempotent. A `settings.json` that cannot be parsed is left untouched rather than overwritten.
+
+By default the `Stop` hook only observes. To make it actually hold the line:
+
+```toml
+[hooks]
+block_on_unverified = true
+```
+
+The agent is then stopped from ending its turn while an in-progress task still has failing or missing checks. It is opt-in on purpose — a hook that fights you is worse than one that does nothing.
+
 ## Skills
 
 AIPIM has two complementary skill systems:
@@ -231,14 +345,18 @@ Claude Code has access to these tools via the MCP server:
 
 | Tool | Description |
 |------|-------------|
-| `get_project_context` | Project name, stats, active blockers, recent decisions |
-| `get_next_task` | Highest-priority backlog task |
+| `get_project_context` | Stats, current task, ready frontier, blockers, cycles, required checks |
+| `get_next_task` | Highest-priority task that is actually startable — never a blocked one |
+| `get_task_graph` | Full dependency graph: nodes, edges, ready frontier, blocked set, cycles |
 | `list_tasks` | All tasks with optional status/assignee/priority filter |
 | `get_task` | Single task with comments and full detail |
 | `get_blockers` | All blocked tasks |
 | `create_task` | Add a task to the backlog |
-| `complete_task` | Mark done, move `.md` to `completed/` |
+| `verify_task` | Run the configured checks and record the result as evidence |
+| `complete_task` | Mark done, move `.md` to `completed/` — gated on verification |
 | `update_task_status` | Change status (backlog → in-progress → review → blocked) |
+| `add_dependency` | Declare that a task waits on another. Cycles rejected |
+| `remove_dependency` | Remove a dependency edge |
 | `assign_task` | Assign to a team member from `config.toml` |
 | `add_comment` | Append a comment (immutable) |
 | `log_decision` | Write an ADR to `decisions/` |
@@ -254,6 +372,12 @@ Additional tools are injected dynamically based on `active_skills` — see [Skil
 name = "MyApp"
 description = "..."
 active_skills = ["database"]  # optional — see Skills section
+
+[checks]                       # optional — see Verification Gate
+commands = ["pnpm test", "pnpm lint"]
+
+[hooks]                        # optional — see Hooks
+block_on_unverified = true
 
 [[team]]
 id = "alice"
@@ -271,7 +395,7 @@ Actor resolution order: `AIPIM_USER` env → git `user.email` matched to a team 
 .project/
 ├── events.jsonl     # append-only event log (source of truth)
 ├── data.db          # SQLite (derived, gitignored)
-├── config.toml      # project + team configuration
+├── config.toml      # project, team, checks and hooks configuration
 ├── context.md       # session state for the AI
 ├── current-task.md  # active task checklist
 ├── backlog/         # YYYY-MM-DD-TASK-NNN-name.md
@@ -283,10 +407,12 @@ Actor resolution order: `AIPIM_USER` env → git `user.email` matched to a team 
 
 `events.jsonl` uses `merge=union` git driver so concurrent team pushes never conflict.
 
+AIPIM also writes `.claude/settings.json` at the project root when Claude Code hooks are installed.
+
 ## Development
 
 ```bash
-pnpm test           # 238 tests
+pnpm test           # 353 tests
 pnpm lint           # eslint + prettier
 pnpm build          # tsup → dist/
 pnpm type-check
