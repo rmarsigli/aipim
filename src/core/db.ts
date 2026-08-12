@@ -13,7 +13,9 @@ import {
     TaskDependencyAddedEvent,
     TaskDependencyRemovedEvent,
     DiscoveryStartedEvent,
-    DiscoveryStateUpdatedEvent
+    DiscoveryStateUpdatedEvent,
+    DiscoveryChangesetProposedEvent,
+    DiscoveryResolvedEvent
 } from '../types/index.js'
 
 const DB_FILE = '.project/data.db'
@@ -44,6 +46,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority    TEXT NOT NULL,
     assignee    TEXT,
     file_path   TEXT,
+    session_id  TEXT,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
@@ -57,13 +60,15 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 
 CREATE TABLE IF NOT EXISTS decisions (
-    id          TEXT PRIMARY KEY,
-    title       TEXT NOT NULL,
-    rationale   TEXT NOT NULL,
-    task_id     TEXT,
-    file_path   TEXT,
-    actor       TEXT NOT NULL,
-    created_at  TEXT NOT NULL
+    id            TEXT PRIMARY KEY,
+    title         TEXT NOT NULL,
+    rationale     TEXT NOT NULL,
+    task_id       TEXT,
+    file_path     TEXT,
+    session_id    TEXT,
+    superseded_by TEXT,
+    actor         TEXT NOT NULL,
+    created_at    TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS task_dependencies (
@@ -103,6 +108,16 @@ CREATE TABLE IF NOT EXISTS discovery_states (
     UNIQUE (session_id, version)
 );
 
+CREATE TABLE IF NOT EXISTS changesets (
+    id          TEXT PRIMARY KEY,
+    session_id  TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    proposed_at TEXT NOT NULL,
+    resolved_at TEXT,
+    resolution  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS events_log (
     id          TEXT PRIMARY KEY,
     type        TEXT NOT NULL,
@@ -117,6 +132,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
 CREATE INDEX IF NOT EXISTS idx_checks_task    ON checks(task_id);
 CREATE INDEX IF NOT EXISTS idx_deps_depends_on ON task_dependencies(depends_on);
 CREATE INDEX IF NOT EXISTS idx_discovery_states_session ON discovery_states(session_id);
+CREATE INDEX IF NOT EXISTS idx_changesets_session ON changesets(session_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_session      ON tasks(session_id);
 `
 
 /**
@@ -163,6 +180,7 @@ export function rebuild(projectRoot: string, events: AipimEvent[]): void {
     const db = openDb(projectRoot)
 
     db.exec('DROP TABLE IF EXISTS events_log')
+    db.exec('DROP TABLE IF EXISTS changesets')
     db.exec('DROP TABLE IF EXISTS discovery_states')
     db.exec('DROP TABLE IF EXISTS discovery_sessions')
     db.exec('DROP TABLE IF EXISTS checks')
@@ -185,9 +203,18 @@ export function rebuild(projectRoot: string, events: AipimEvent[]): void {
 
 function handleTaskCreated(db: Database.Database, event: TaskCreatedEvent): void {
     db.prepare(
-        `INSERT OR IGNORE INTO tasks (id, title, task_type, status, priority, file_path, created_at, updated_at)
-         VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?)`
-    ).run(event.taskId, event.title, event.taskType, event.priority, event.filePath, event.timestamp, event.timestamp)
+        `INSERT OR IGNORE INTO tasks (id, title, task_type, status, priority, file_path, session_id, created_at, updated_at)
+         VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?, ?)`
+    ).run(
+        event.taskId,
+        event.title,
+        event.taskType,
+        event.priority,
+        event.filePath,
+        event.sessionId ?? null,
+        event.timestamp,
+        event.timestamp
+    )
 }
 
 function handleTaskStatusChanged(db: Database.Database, event: TaskStatusChangedEvent): void {
@@ -226,17 +253,24 @@ function handleTaskCompleted(db: Database.Database, event: TaskCompletedEvent): 
 
 function handleDecisionLogged(db: Database.Database, event: DecisionLoggedEvent): void {
     db.prepare(
-        `INSERT INTO decisions (id, title, rationale, task_id, file_path, actor, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT OR IGNORE INTO decisions (id, title, rationale, task_id, file_path, session_id, actor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         event.id,
         event.title,
         event.rationale,
         event.taskId ?? null,
         event.filePath ?? null,
+        event.sessionId ?? null,
         event.actor,
         event.timestamp
     )
+
+    // A superseded decision stays readable — it is marked as replaced, never
+    // deleted. Knowing what a decision was replaced by is the point.
+    for (const supersededId of event.supersedes ?? []) {
+        db.prepare('UPDATE decisions SET superseded_by = ? WHERE id = ?').run(event.id, supersededId)
+    }
 }
 
 function handleCheckRun(db: Database.Database, event: CheckRunEvent): void {
@@ -297,6 +331,54 @@ function handleDiscoveryStateUpdated(db: Database.Database, event: DiscoveryStat
 }
 
 /**
+ * Records a proposed changeset and moves its session to `proposed`.
+ *
+ * Any earlier proposal in the same session becomes `superseded`: asking for a
+ * revision produces a new changeset, and only the newest one is in play. The
+ * older ones stay in the table as the record of what was proposed first.
+ */
+function handleChangesetProposed(db: Database.Database, event: DiscoveryChangesetProposedEvent): void {
+    db.prepare(
+        `UPDATE changesets SET status = 'superseded' WHERE session_id = ? AND status = 'proposed' AND id != ?`
+    ).run(event.sessionId, event.changesetId)
+
+    db.prepare(
+        `INSERT OR IGNORE INTO changesets (id, session_id, payload, status, proposed_at)
+         VALUES (?, ?, ?, 'proposed', ?)`
+    ).run(event.changesetId, event.sessionId, JSON.stringify(event.changeset), event.timestamp)
+
+    db.prepare(`UPDATE discovery_sessions SET status = 'proposed', updated_at = ? WHERE id = ?`).run(
+        event.timestamp,
+        event.sessionId
+    )
+}
+
+// Where a resolution leaves the session. A revision request reopens it; the
+// other two are terminal.
+const SESSION_STATUS_AFTER: Record<string, string> = {
+    applied: 'applied',
+    abandoned: 'abandoned',
+    revision_requested: 'open'
+}
+
+function handleDiscoveryResolved(db: Database.Database, event: DiscoveryResolvedEvent): void {
+    if (event.changesetId && event.resolution !== 'revision_requested') {
+        db.prepare('UPDATE changesets SET status = ?, resolution = ?, resolved_at = ? WHERE id = ?').run(
+            event.resolution,
+            event.resolution,
+            event.timestamp,
+            event.changesetId
+        )
+    }
+
+    db.prepare('UPDATE discovery_sessions SET status = ?, updated_at = ? WHERE id = ?').run(
+        SESSION_STATUS_AFTER[event.resolution] ?? 'open',
+        event.timestamp,
+        event.sessionId
+    )
+}
+
+/**
  * Applies a single event to an already-open database.
  * Used both during rebuild and for incremental updates (append → applyEvent).
  */
@@ -332,6 +414,10 @@ export function applyEvent(db: Database.Database, event: AipimEvent): void {
             return handleDiscoveryStarted(db, event)
         case 'discovery.state_updated':
             return handleDiscoveryStateUpdated(db, event)
+        case 'discovery.changeset_proposed':
+            return handleChangesetProposed(db, event)
+        case 'discovery.resolved':
+            return handleDiscoveryResolved(db, event)
         // Events that don't mutate derived state (content_updated, dependency_*, session_*)
         default:
             break
@@ -348,6 +434,8 @@ export interface TaskRow {
     priority: string
     assignee: string | null
     file_path: string | null
+    /** The discovery session this task came from, when it came from one. */
+    session_id: string | null
     created_at: string
     updated_at: string
 }
@@ -366,6 +454,9 @@ export interface DecisionRow {
     rationale: string
     task_id: string | null
     file_path: string | null
+    session_id: string | null
+    /** ID of the decision that replaced this one, when one has. */
+    superseded_by: string | null
     actor: string
     created_at: string
 }
@@ -530,6 +621,36 @@ export function getDiscoveryStates(db: Database.Database, sessionId: string): Di
     return db
         .prepare('SELECT * FROM discovery_states WHERE session_id = ? ORDER BY version ASC')
         .all(sessionId) as DiscoveryStateRow[]
+}
+
+export interface ChangesetRow {
+    id: string
+    session_id: string
+    payload: string
+    status: string
+    proposed_at: string
+    resolved_at: string | null
+    resolution: string | null
+}
+
+export function getChangeset(db: Database.Database, changesetId: string): ChangesetRow | undefined {
+    return db.prepare('SELECT * FROM changesets WHERE id = ?').get(changesetId) as ChangesetRow | undefined
+}
+
+/**
+ * Returns the changeset currently in play for a session — the newest one that
+ * has not been superseded by a later proposal.
+ */
+export function getProposedChangeset(db: Database.Database, sessionId: string): ChangesetRow | undefined {
+    return db
+        .prepare(`SELECT * FROM changesets WHERE session_id = ? AND status = 'proposed' ORDER BY proposed_at DESC`)
+        .get(sessionId) as ChangesetRow | undefined
+}
+
+export function getChangesetsForSession(db: Database.Database, sessionId: string): ChangesetRow[] {
+    return db
+        .prepare('SELECT * FROM changesets WHERE session_id = ? ORDER BY proposed_at ASC')
+        .all(sessionId) as ChangesetRow[]
 }
 
 export function getStats(db: Database.Database): Record<string, number> {

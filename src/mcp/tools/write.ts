@@ -14,6 +14,7 @@ import {
 import { wouldCreateCycle } from '../../core/graph.js'
 import { getMember } from '../../core/team.js'
 import { getRequiredChecks, evaluateGate, lastActivityAt, explainGate } from '../../core/verification.js'
+import { adrMarkdown, slugify, taskMarkdown, today } from '../../core/markdown.js'
 import { validatePathSafe } from '../../utils/path-validator.js'
 import type { McpTool, ToolContext } from './index.js'
 
@@ -75,18 +76,6 @@ function nextTaskId(ctx: ToolContext): string {
     return `TASK-${(max + 1).toString().padStart(3, '0')}`
 }
 
-function slugify(str: string): string {
-    return str
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '')
-        .slice(0, 40)
-}
-
-function today(): string {
-    return new Date().toISOString().split('T')[0]
-}
-
 /**
  * Builds the archive filename for a completed task.
  *
@@ -96,40 +85,6 @@ function today(): string {
  */
 function completedFilename(filePath: string): string {
     return `${today()}-${basename(filePath).replace(/^\d{4}-\d{2}-\d{2}-/, '')}`
-}
-
-function adrMarkdown(title: string, rationale: string, taskId?: string): string {
-    const taskLine = taskId ? `taskId: ${taskId}\n` : ''
-    return `---
-title: "${title}"
-date: ${today()}
-${taskLine}status: Accepted
----
-
-# ${title}
-
-## Rationale
-
-${rationale}
-
-## Status
-
-Accepted
-`
-}
-
-function taskMarkdown(title: string, taskId: string, priority: string, taskType: string, description?: string): string {
-    return `---
-title: "${title}"
-created: ${new Date().toISOString()}
-priority: ${priority}
-status: backlog
-tags: [${taskType}]
----
-
-# ${title}
-${description ? `\n${description}\n` : ''}
-`
 }
 
 export const writeTools: McpTool[] = [
@@ -345,6 +300,11 @@ export const writeTools: McpTool[] = [
                         type: 'string',
                         description:
                             'Relative path to an existing .md file. If provided, the file is linked as-is instead of creating a new one.'
+                    },
+                    supersedes: {
+                        type: 'array',
+                        description: 'IDs of existing decisions this one replaces. They are marked, never deleted.',
+                        items: { type: 'string' }
                     }
                 }
             }
@@ -354,6 +314,9 @@ export const writeTools: McpTool[] = [
             const rationale = args.rationale as string
             const taskId = args.taskId as string | undefined
             const existingFilePath = args.filePath as string | undefined
+            const supersedes = Array.isArray(args.supersedes)
+                ? (args.supersedes as unknown[]).filter((id): id is string => typeof id === 'string')
+                : undefined
 
             const decisionsDir = join(projectRoot, '.project/decisions')
             mkdirSync(decisionsDir, { recursive: true })
@@ -368,7 +331,7 @@ export const writeTools: McpTool[] = [
                 filePath = existingFilePath
             } else {
                 filePath = `.project/decisions/${today()}-ADR-${slugify(title)}.md`
-                writeFileSync(join(projectRoot, filePath), adrMarkdown(title, rationale, taskId), 'utf8')
+                writeFileSync(join(projectRoot, filePath), adrMarkdown(title, rationale, taskId, supersedes), 'utf8')
             }
 
             const event = await appendEvent(projectRoot, {
@@ -376,7 +339,8 @@ export const writeTools: McpTool[] = [
                 title,
                 rationale,
                 taskId,
-                filePath
+                filePath,
+                ...(supersedes?.length ? { supersedes } : {})
             })
             applyEvent(db, event)
 
@@ -401,7 +365,8 @@ export const writeTools: McpTool[] = [
                         type: 'string',
                         enum: ['P1-S', 'P1-M', 'P1-L', 'P2-S', 'P2-M', 'P2-L', 'P3']
                     },
-                    description: { type: 'string' }
+                    description: { type: 'string' },
+                    estimatedHours: { type: 'number' }
                 }
             }
         },
@@ -411,6 +376,7 @@ export const writeTools: McpTool[] = [
             const taskType = args.taskType as string
             const priority = args.priority as string
             const description = args.description as string | undefined
+            const estimatedHours = typeof args.estimatedHours === 'number' ? args.estimatedHours : undefined
 
             const taskId = nextTaskId(ctx)
             const filePath = `.project/backlog/${today()}-${taskId}-${slugify(title)}.md`
@@ -418,7 +384,7 @@ export const writeTools: McpTool[] = [
             mkdirSync(join(projectRoot, '.project/backlog'), { recursive: true })
             writeFileSync(
                 join(projectRoot, filePath),
-                taskMarkdown(title, taskId, priority, taskType, description),
+                taskMarkdown({ title, priority, taskType, estimatedHours, description }),
                 'utf8'
             )
 

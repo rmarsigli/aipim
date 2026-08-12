@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { mkdirSync, rmSync, existsSync, readFileSync, appendFileSync } from 'fs'
 import { join } from 'path'
-import { appendEvent, readEvents, readEventsForTask } from '../../src/core/events.js'
+import { appendEvent, appendEvents, readEvents, readEventsForTask } from '../../src/core/events.js'
 
 const TEST_ROOT = join(process.cwd(), 'tests/__fixtures__/events-test')
 const EVENTS_FILE = join(TEST_ROOT, '.project/events.jsonl')
@@ -206,5 +206,64 @@ describe('readEventsForTask', () => {
 
         const events = readEventsForTask(TEST_ROOT, 'TASK-999')
         expect(events).toEqual([])
+    })
+})
+
+describe('appendEvents', () => {
+    function created(taskId: string) {
+        return {
+            type: 'task.created' as const,
+            taskId,
+            title: taskId,
+            taskType: 'feat',
+            priority: 'P2-M',
+            filePath: `.project/backlog/${taskId}.md`,
+        }
+    }
+
+    it('writes the whole batch', async () => {
+        const events = await appendEvents(TEST_ROOT, [created('TASK-001'), created('TASK-002'), created('TASK-003')])
+
+        expect(events).toHaveLength(3)
+        expect(readEvents(TEST_ROOT)).toHaveLength(3)
+    })
+
+    it('gives every event in a batch a distinct id', async () => {
+        const events = await appendEvents(TEST_ROOT, Array.from({ length: 25 }, (_, i) => created(`TASK-${i}`)))
+        expect(new Set(events.map((e) => e.id)).size).toBe(25)
+    })
+
+    it('preserves batch order on read back, so dependencies replay after their tasks', async () => {
+        await appendEvents(TEST_ROOT, [
+            created('TASK-001'),
+            created('TASK-002'),
+            { type: 'task.dependency_added' as const, taskId: 'TASK-002', dependsOn: 'TASK-001' },
+        ])
+
+        expect(readEvents(TEST_ROOT).map((e) => e.type)).toEqual([
+            'task.created',
+            'task.created',
+            'task.dependency_added',
+        ])
+    })
+
+    it('writes nothing for an empty batch', async () => {
+        expect(await appendEvents(TEST_ROOT, [])).toEqual([])
+        expect(existsSync(EVENTS_FILE)).toBe(false)
+    })
+
+    it('does not interleave with a concurrent single append', async () => {
+        await Promise.all([
+            appendEvents(TEST_ROOT, [created('TASK-001'), created('TASK-002'), created('TASK-003')]),
+            appendEvent(TEST_ROOT, created('TASK-999')),
+        ])
+
+        const lines = readFileSync(EVENTS_FILE, 'utf8').trim().split('\n')
+        const ids = lines.map((line) => JSON.parse(line).taskId)
+        const batchPositions = ['TASK-001', 'TASK-002', 'TASK-003'].map((id) => ids.indexOf(id))
+
+        expect(lines).toHaveLength(4)
+        expect(batchPositions[1]).toBe(batchPositions[0] + 1)
+        expect(batchPositions[2]).toBe(batchPositions[1] + 1)
     })
 })

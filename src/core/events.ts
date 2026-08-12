@@ -32,6 +32,23 @@ function generateId(): string {
  * overlapping async tool handlers don't interleave partial writes.
  */
 export async function appendEvent(projectRoot: string, partial: PartialEvent): Promise<AipimEvent> {
+    const [event] = await appendEvents(projectRoot, [partial])
+    return event
+}
+
+/**
+ * Appends several events as one unit: they are stamped together and written in
+ * a single call while the lock is held, so nothing can interleave between them.
+ *
+ * This is what makes applying a discovery changeset atomic. Writing its events
+ * one at a time would let a concurrent tool call land in the middle, leaving
+ * the log with half a changeset applied.
+ *
+ * Events in a batch share a timestamp. `readEvents` sorts stably, so the order
+ * they are passed in is the order they replay in — tasks before the
+ * dependencies that reference them.
+ */
+export async function appendEvents(projectRoot: string, partials: PartialEvent[]): Promise<AipimEvent[]> {
     const prev = appendLocks.get(projectRoot) ?? Promise.resolve()
     let unlock!: () => void
     appendLocks.set(
@@ -43,18 +60,24 @@ export async function appendEvent(projectRoot: string, partial: PartialEvent): P
 
     await prev
     try {
-        const event = {
-            ...partial,
-            id: generateId(),
-            timestamp: new Date().toISOString(),
-            actor: resolveActor(projectRoot)
-        } as AipimEvent
+        if (partials.length === 0) return []
+
+        const actor = resolveActor(projectRoot)
+        const timestamp = new Date().toISOString()
+        const taken = new Set<string>()
+
+        const events = partials.map((partial) => {
+            let id = generateId()
+            while (taken.has(id)) id = generateId()
+            taken.add(id)
+            return { ...partial, id, timestamp, actor } as AipimEvent
+        })
 
         const filePath = join(projectRoot, EVENTS_FILE)
-        appendFileSync(filePath, JSON.stringify(event) + '\n', 'utf8')
-        // Invalidate mtime cache so the next readEvents() picks up the new event
+        appendFileSync(filePath, events.map((event) => JSON.stringify(event)).join('\n') + '\n', 'utf8')
+        // Invalidate mtime cache so the next readEvents() picks up the new events
         eventsCache.delete(projectRoot)
-        return event
+        return events
     } finally {
         unlock()
     }

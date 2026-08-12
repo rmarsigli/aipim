@@ -6,6 +6,14 @@ import {
     recordDiscoveryState,
     startDiscovery
 } from '../../core/discovery.js'
+import {
+    applyChangeset,
+    parseChangeset,
+    proposeChangeset,
+    resolveWithoutApplying,
+    validateChangeset
+} from '../../core/changeset.js'
+import { getChangeset, getProposedChangeset } from '../../core/db.js'
 import type { McpTool, ToolContext } from './index.js'
 
 /**
@@ -156,6 +164,8 @@ export const discoveryTools: McpTool[] = [
                     : { message: 'No open discovery session.', openSessions: [] }
             }
 
+            const proposed = getProposedChangeset(db, loaded.session.id)
+
             return {
                 sessionId: loaded.session.id,
                 topic: loaded.session.topic,
@@ -163,8 +173,162 @@ export const discoveryTools: McpTool[] = [
                 startedAt: loaded.session.started_at,
                 updatedAt: loaded.session.updated_at,
                 version: loaded.version,
-                state: loaded.state
+                state: loaded.state,
+                proposedChangeset: proposed ? { changesetId: proposed.id, changeset: parseChangeset(proposed) } : null
             }
+        }
+    },
+
+    {
+        schema: {
+            name: 'propose_changeset',
+            description:
+                'Propose what a discovery session should change in the project: tasks to create, dependencies between them, decisions to record, docs to write. Recording a proposal never applies it — show the result to the user as a readable diff and only call resolve_changeset once they approve.',
+            inputSchema: {
+                type: 'object',
+                required: ['sessionId', 'changeset'],
+                properties: {
+                    sessionId: { type: 'string', description: 'Session ID, e.g. D001' },
+                    changeset: {
+                        type: 'object',
+                        properties: {
+                            tasks: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        localId: {
+                                            type: 'string',
+                                            description: 'Local handle starting with #, e.g. "#1". Dependencies use it.'
+                                        },
+                                        title: { type: 'string' },
+                                        taskType: {
+                                            type: 'string',
+                                            enum: ['feat', 'fix', 'chore', 'docs', 'refactor', 'test']
+                                        },
+                                        priority: {
+                                            type: 'string',
+                                            enum: ['P1-S', 'P1-M', 'P1-L', 'P2-S', 'P2-M', 'P2-L', 'P3']
+                                        },
+                                        estimatedHours: { type: 'number' },
+                                        description: { type: 'string' }
+                                    }
+                                }
+                            },
+                            dependencies: {
+                                type: 'array',
+                                description: 'Edges. Either end may be a local ref ("#1") or an existing ID.',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        taskRef: { type: 'string' },
+                                        dependsOnRef: { type: 'string' }
+                                    }
+                                }
+                            },
+                            decisions: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        title: { type: 'string' },
+                                        rationale: { type: 'string' },
+                                        supersedes: { type: 'array', items: { type: 'string' } }
+                                    }
+                                }
+                            },
+                            docs: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: { path: { type: 'string' }, content: { type: 'string' } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
+            const sessionId = args.sessionId as string
+            const session = loadDiscovery(db, sessionId)
+
+            // A changeset exists only inside a session, and sessions only start
+            // when the user asks for one. That is what keeps discovery from
+            // firing on its own in the middle of unrelated work.
+            if (!session) return { error: `Discovery session ${sessionId} not found` }
+            if (session.session.status === 'applied' || session.session.status === 'abandoned') {
+                return { error: `Discovery session ${sessionId} is already ${session.session.status}` }
+            }
+
+            const result = await proposeChangeset(projectRoot, db, sessionId, args.changeset)
+            return {
+                success: true,
+                changesetId: result.changesetId,
+                changeset: result.changeset,
+                validation: result.validation
+            }
+        }
+    },
+
+    {
+        schema: {
+            name: 'resolve_changeset',
+            description:
+                'Resolve a proposed changeset. "applied" creates everything in it as one atomic batch; "abandoned" closes the session without changing anything; "revision_requested" reopens the session so the proposal can be reworked. Only call with "applied" after the user has explicitly approved.',
+            inputSchema: {
+                type: 'object',
+                required: ['sessionId', 'resolution'],
+                properties: {
+                    sessionId: { type: 'string' },
+                    changesetId: { type: 'string', description: 'Defaults to the session current proposal.' },
+                    resolution: { type: 'string', enum: ['applied', 'abandoned', 'revision_requested'] },
+                    force: {
+                        type: 'boolean',
+                        description: 'Apply despite failing validators. Recorded in the event log as a bypass.'
+                    }
+                }
+            }
+        },
+        handler: async ({ db, projectRoot }: ToolContext, args: Record<string, unknown>): Promise<unknown> => {
+            const sessionId = args.sessionId as string
+            const resolution = args.resolution as 'applied' | 'abandoned' | 'revision_requested'
+
+            const session = loadDiscovery(db, sessionId)
+            if (!session) return { error: `Discovery session ${sessionId} not found` }
+
+            const requestedId = args.changesetId as string | undefined
+            const row = requestedId ? getChangeset(db, requestedId) : getProposedChangeset(db, sessionId)
+
+            if (resolution !== 'abandoned' && !row) {
+                return { error: `No proposed changeset for session ${sessionId}` }
+            }
+            if (row && row.session_id !== sessionId) {
+                return { error: `Changeset ${row.id} does not belong to session ${sessionId}` }
+            }
+
+            if (resolution !== 'applied') {
+                await resolveWithoutApplying(projectRoot, db, sessionId, row?.id, resolution)
+                return { success: true, sessionId, resolution }
+            }
+
+            const changeset = parseChangeset(row as NonNullable<typeof row>)
+            const validation = validateChangeset(db, changeset)
+            if (!validation.valid) {
+                return {
+                    error: `Changeset ${(row as NonNullable<typeof row>).id} cannot be applied`,
+                    errors: validation.errors
+                }
+            }
+
+            const applied = await applyChangeset(
+                projectRoot,
+                db,
+                sessionId,
+                (row as NonNullable<typeof row>).id,
+                changeset
+            )
+            return { success: true, sessionId, resolution, applied }
         }
     }
 ]

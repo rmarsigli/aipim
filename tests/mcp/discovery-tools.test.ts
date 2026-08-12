@@ -126,6 +126,142 @@ describe('get_discovery_state', () => {
     })
 })
 
+describe('propose_changeset', () => {
+    it('should record a proposal and report validation', async () => {
+        const sessionId = await openSession()
+        const result = await call('propose_changeset', {
+            sessionId,
+            changeset: { tasks: [{ localId: '#1', title: 'Build it', taskType: 'feat', priority: 'P2-M' }] }
+        })
+
+        expect(result.success).toBe(true)
+        expect(result.changesetId).toBe(`${sessionId}-CS1`)
+        expect(result.validation).toEqual({ valid: true, errors: [] })
+    })
+
+    it('should refuse a proposal outside a session, which is what keeps discovery from self-starting', async () => {
+        const result = await call('propose_changeset', { sessionId: 'D999', changeset: {} })
+        expect(result.error).toContain('D999')
+        expect(result.success).toBeUndefined()
+    })
+
+    it('should refuse a proposal on a session already resolved', async () => {
+        const sessionId = await openSession()
+        await call('propose_changeset', { sessionId, changeset: {} })
+        await call('resolve_changeset', { sessionId, resolution: 'abandoned' })
+
+        const result = await call('propose_changeset', { sessionId, changeset: {} })
+        expect(result.error).toContain('already abandoned')
+    })
+
+    it('should report validation problems without refusing to record them', async () => {
+        const sessionId = await openSession()
+        const result = await call('propose_changeset', {
+            sessionId,
+            changeset: { dependencies: [{ taskRef: '#1', dependsOnRef: '#2' }] }
+        })
+
+        expect(result.success).toBe(true)
+        expect((result.validation as { valid: boolean }).valid).toBe(false)
+    })
+})
+
+describe('resolve_changeset', () => {
+    async function proposeSimple(sessionId: string): Promise<string> {
+        const result = await call('propose_changeset', {
+            sessionId,
+            changeset: {
+                tasks: [
+                    { localId: '#1', title: 'Schema', taskType: 'feat', priority: 'P1-M', estimatedHours: 3 },
+                    { localId: '#2', title: 'Core logic', taskType: 'feat', priority: 'P1-M', estimatedHours: 6 }
+                ],
+                dependencies: [{ taskRef: '#2', dependsOnRef: '#1' }],
+                decisions: [{ title: 'Event sourced', rationale: 'history for free' }]
+            }
+        })
+        return result.changesetId as string
+    }
+
+    it('should apply the whole changeset atomically', async () => {
+        const sessionId = await openSession()
+        await proposeSimple(sessionId)
+
+        const result = await call('resolve_changeset', { sessionId, resolution: 'applied' })
+        const applied = result.applied as Record<string, unknown>
+
+        expect(result.success).toBe(true)
+        expect(applied.eventCount).toBe(5)
+        expect((applied.tasks as Array<{ taskId: string }>).map((t) => t.taskId)).toEqual(['TASK-001', 'TASK-002'])
+    })
+
+    it('should refuse to apply an invalid changeset', async () => {
+        const sessionId = await openSession()
+        await call('propose_changeset', {
+            sessionId,
+            changeset: { dependencies: [{ taskRef: 'TASK-404', dependsOnRef: 'TASK-405' }] }
+        })
+
+        const result = await call('resolve_changeset', { sessionId, resolution: 'applied' })
+        expect(result.error).toContain('cannot be applied')
+        expect((result.errors as string[]).length).toBeGreaterThan(0)
+    })
+
+    it('should leave nothing behind when it refuses', async () => {
+        const sessionId = await openSession()
+        await call('propose_changeset', {
+            sessionId,
+            changeset: {
+                tasks: [{ localId: '#1', title: 'Would be created', taskType: 'feat', priority: 'P2-M' }],
+                dependencies: [{ taskRef: '#1', dependsOnRef: '#404' }]
+            }
+        })
+        await call('resolve_changeset', { sessionId, resolution: 'applied' })
+
+        expect(db.prepare('SELECT COUNT(*) AS count FROM tasks').get()).toEqual({ count: 0 })
+    })
+
+    it('should reopen the session for revision and accept a new proposal', async () => {
+        const sessionId = await openSession()
+        const first = await proposeSimple(sessionId)
+
+        await call('resolve_changeset', { sessionId, resolution: 'revision_requested' })
+        const second = await call('propose_changeset', {
+            sessionId,
+            changeset: { tasks: [{ localId: '#1', title: 'Reworked', taskType: 'feat', priority: 'P2-M' }] }
+        })
+
+        expect(second.changesetId).not.toBe(first)
+        expect((await call('get_discovery_state', { sessionId })).status).toBe('proposed')
+    })
+
+    it('should surface the current proposal when resuming', async () => {
+        const sessionId = await openSession()
+        const changesetId = await proposeSimple(sessionId)
+
+        const resumed = await call('get_discovery_state', { sessionId })
+        const proposed = resumed.proposedChangeset as Record<string, unknown>
+
+        expect(proposed.changesetId).toBe(changesetId)
+        expect((proposed.changeset as { tasks: unknown[] }).tasks).toHaveLength(2)
+    })
+
+    it('should error when there is nothing proposed to apply', async () => {
+        const sessionId = await openSession()
+        expect((await call('resolve_changeset', { sessionId, resolution: 'applied' })).error).toContain(
+            'No proposed changeset'
+        )
+    })
+
+    it('should refuse a changeset belonging to another session', async () => {
+        const first = await openSession('first')
+        const changesetId = await proposeSimple(first)
+        const second = await openSession('second')
+
+        const result = await call('resolve_changeset', { sessionId: second, changesetId, resolution: 'applied' })
+        expect(result.error).toContain('does not belong')
+    })
+})
+
 describe('find_related', () => {
     beforeEach(() => {
         const event: TaskCreatedEvent = {

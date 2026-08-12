@@ -72,6 +72,8 @@ export type EventType =
     | 'check.run'
     | 'discovery.started'
     | 'discovery.state_updated'
+    | 'discovery.changeset_proposed'
+    | 'discovery.resolved'
     | 'session.started'
     | 'session.ended'
 
@@ -89,6 +91,8 @@ export const EVENT_TYPES: EventType[] = [
     'check.run',
     'discovery.started',
     'discovery.state_updated',
+    'discovery.changeset_proposed',
+    'discovery.resolved',
     'session.started',
     'session.ended'
 ]
@@ -190,6 +194,9 @@ export interface DecisionLoggedEvent extends BaseEvent {
     rationale: string
     taskId?: string
     filePath?: string
+    /** IDs of decisions this one replaces. Recording the replacement is what
+     *  keeps a superseded ADR readable instead of silently wrong. */
+    supersedes?: string[]
 }
 
 // ─── Discovery ─────────────────────────────────────────────────────────────
@@ -255,10 +262,78 @@ export interface DiscoveryState {
     openThreads: string[]
 }
 
+// ─── Changesets ────────────────────────────────────────────────────────────
+
+/**
+ * A task the discussion wants to create. `localId` ('#1', '#2', …) lets other
+ * parts of the same changeset reference it before it has a real ID.
+ */
+export interface ProposedTask {
+    localId: string
+    title: string
+    taskType: string
+    priority: string
+    estimatedHours?: number
+    description?: string
+}
+
+/** An edge. Either end may be a local ref ('#1') or an existing ID ('TASK-035'). */
+export interface ProposedDependency {
+    taskRef: string
+    dependsOnRef: string
+}
+
+export interface ProposedDecision {
+    title: string
+    rationale: string
+    /** IDs of existing decisions this one replaces. */
+    supersedes?: string[]
+}
+
+export interface ProposedDoc {
+    path: string
+    content: string
+}
+
+/**
+ * A proposed diff over the project graph — the terminal artifact of a
+ * discovery session.
+ *
+ * Modelling the output as a diff rather than as a spec document is what lets
+ * greenfield and mid-project discovery share one mechanism: on an empty project
+ * every entry is an insert and no edge points outward, which needs no special
+ * case anywhere.
+ */
+export interface Changeset {
+    tasks: ProposedTask[]
+    dependencies: ProposedDependency[]
+    decisions: ProposedDecision[]
+    docs: ProposedDoc[]
+}
+
+export const CHANGESET_RESOLUTIONS = ['applied', 'abandoned', 'revision_requested'] as const
+export type ChangesetResolution = (typeof CHANGESET_RESOLUTIONS)[number]
+
 export interface DiscoveryStartedEvent extends BaseEvent {
     type: 'discovery.started'
     sessionId: string
     topic: string
+}
+
+export interface DiscoveryChangesetProposedEvent extends BaseEvent {
+    type: 'discovery.changeset_proposed'
+    sessionId: string
+    changesetId: string
+    changeset: Changeset
+}
+
+export interface DiscoveryResolvedEvent extends BaseEvent {
+    type: 'discovery.resolved'
+    sessionId: string
+    changesetId?: string
+    resolution: ChangesetResolution
+    /** True when the configurable validators were explicitly overridden. */
+    validatorsBypassed?: boolean
 }
 
 export interface DiscoveryStateUpdatedEvent extends BaseEvent {
@@ -292,5 +367,7 @@ export type AipimEvent =
     | CheckRunEvent
     | DiscoveryStartedEvent
     | DiscoveryStateUpdatedEvent
+    | DiscoveryChangesetProposedEvent
+    | DiscoveryResolvedEvent
     | SessionStartedEvent
     | SessionEndedEvent
