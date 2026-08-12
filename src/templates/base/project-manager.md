@@ -27,14 +27,19 @@
 
 **Start (MANDATORY — pick one):**
 
-*With AIPIM MCP (recommended):*
-1. Call `get_project_context` MCP tool — returns current state, stats, next task
+*With Claude Code hooks installed (nothing to do):*
+The `SessionStart` hook already injected the current state — task in progress, next ready
+task, blocked set, cycles, required checks. Just continue from it.
+
+*With AIPIM MCP:*
+1. Call `get_project_context` MCP tool — returns state, stats, next ready task, blockers,
+   the dependency graph and which checks the project requires
 2. Review last commit: `git log -1 --oneline`
 3. Continue from `next_action`
 
 *Without MCP (fallback):*
 1. Read `context.md` (session state, next_action)
-2. Read `current-task.md` (active checklist)
+2. Run `aipim task next` for the next startable task, or `aipim deps` for the whole graph
 3. Review last commit: `git log -1 --oneline`
 
 **Interruption Recovery:**
@@ -45,14 +50,17 @@
 - Update task checkboxes as completed
 - Commit frequently
 - Add discoveries via `create_task` MCP tool or directly to backlog
+- If the task turns out to depend on other work, call `add_dependency` instead of leaving a
+  note about it — that keeps it out of the ready frontier until it can actually start
 
 **End:**
-1. Call `complete_task` MCP tool (or move file manually to `completed/`)
-2. Update `context.md`: session++, next_action, summary
-3. Call `get_next_task` to select next task
-4. **Run Quality Check (Optional):** `.project/scripts/analyze-quality.sh --manual`
-5. **Update metrics** (see Metrics Protocol below)
-6. Commit & push
+1. Call `verify_task` — runs the project checks and records the evidence
+2. Call `complete_task` MCP tool (refused if the checks did not pass; see Verification below)
+3. Update `context.md`: session++, next_action, summary
+4. Call `get_next_task` to select next task
+5. **Run Quality Check (Optional):** `.project/scripts/analyze-quality.sh --manual`
+6. **Update metrics** (see Metrics Protocol below)
+7. Commit & push
 
 ## Task Workflow Protocol (MANDATORY)
 
@@ -64,10 +72,17 @@
   — OR — read `.project/context.md` + `.project/backlog/` manually if MCP unavailable
 
 **2. Quality Gates (BEFORE marking task complete):**
-- [ ] All tests passing (`npm test` or equivalent)
-- [ ] No lint warnings (`npm run lint`)
+
+If `.project/config.toml` declares `[checks] commands`, this is enforced, not trusted: call
+`verify_task` and `complete_task` will refuse until every command passed against the current
+state of the work. Do not work around a failing gate — fix the work.
+
+- [ ] `verify_task` called and all checks green
 - [ ] Definition of Done satisfied (see DoD section above)
 - [ ] Code reviewed and clean (no debug code, console.logs, TODOs)
+
+If no `[checks]` are configured the gate does not exist, and running the tests and linter
+before completing is on you.
 
 **3. Git Commit (ONE atomic commit per task):**
 - Format: `type(scope): description` (SINGLE LINE ONLY)
@@ -390,6 +405,13 @@ claude mcp add --transport http aipim http://localhost:3141/mcp
 # Migrate existing v1 project to v2 event log
 aipim migrate
 
+# Register the Claude Code hooks (session state on start, verification on stop)
+aipim hook install
+
+# Next startable task, and the full dependency graph
+aipim task next
+aipim deps
+
 # Manual task file operations (fallback without MCP)
 cp .project/_templates/task.md .project/current-task.md
 mv .project/backlog/T{XXX}-{name}.md .project/current-task.md
@@ -400,7 +422,26 @@ mv .project/current-task.md .project/completed/$(date +%Y-%m-%d)-T{XXX}-{name}.m
 .project/scripts/pre-session.sh
 ```
 
-**MCP tools replace most manual commands.** Use `create_task`, `complete_task`, `update_task_status`, `log_decision` via Claude Code instead of editing files directly.
+**MCP tools replace most manual commands.** Use `create_task`, `verify_task`, `complete_task`,
+`update_task_status`, `add_dependency`, `log_decision` via Claude Code instead of editing
+files directly.
+
+### Verification
+
+`verify_task` runs the commands in `[checks]` and records a `check.run` event for each —
+command, exit code, pass/fail, duration. `complete_task` is refused unless every required
+command has a passing run *after the task last changed*, so stale evidence does not count.
+
+`complete_task` accepts `force: true` for a task where the checks genuinely do not apply. It
+completes and records `checksBypassed: true`. Use it deliberately, never to get past a
+failure you should have fixed.
+
+### Dependencies
+
+`add_dependency(taskId, dependsOn)` declares that a task waits on another. Dependent tasks
+stay out of the ready frontier until their blockers are done, and `get_next_task` never hands
+back blocked work. Cycles are rejected when the edge is created. `get_task_graph` shows every
+node, the ready set, the blocked set and any cycles.
 
 ## Context Management
 
