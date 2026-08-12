@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-08-12
+
+A packaging fix. The 2.3.0 feature set is unchanged — this is what makes part of it actually
+reach the people who install it.
+
+### Fixed
+
+- **The published package never contained the Svelte UI.** `package.json` declared `ui/dist`
+  in `files`, but the release build only ran `tsup`, which builds the CLI. `ui/` is a separate
+  pnpm project and was never built during publish, so every tarball since 2.1.0 shipped
+  without it. Installing from npm and running `aipim ui` started the server and served
+  nothing: `server.ts` guards the route with `existsSync(UI_DIST)`, so it failed silently —
+  no UI, no error, just a 404 at `/ui/`.
+
+### Added
+
+- `pnpm run build:ui` builds the Svelte UI; `pnpm run build:release` builds both it and the
+  CLI. The publish workflow now runs `build:release`.
+- `prepublishOnly` runs `scripts/verify-package.mjs`, which refuses to publish when any entry
+  in `files` is missing or is an empty directory. Fixing the build stops this bug once;
+  the guard stops it from coming back.
+
+### Documentation
+
+- `docs/` covers the 2.3.0 features it had missed entirely: `verify_task`, `add_dependency`,
+  `get_task_graph`, `aipim hook`, `[checks]` and `[hooks]`. `cli-reference.md` gained the
+  `hook` command and `GET /api/graph`; `troubleshooting.md` gained five entries, including
+  how to read a gate rejection (`never run` vs `stale` vs `failing`).
+- `src/templates/base/project-manager.md` — the source of every generated `CLAUDE.md` — now
+  documents the verification gate and the dependency tools, so an agent knows `verify_task`
+  exists before the gate tells it. Its fallback no longer points at `current-task.md`, which
+  2.x does not create.
+
 ## [2.3.0] - 2026-08-12
 
 The event log stops being only a record and starts being the mechanism that enforces the process. See `.project/decisions/2026-08-12-ADR010-loop-and-graph-engineering.md`.
