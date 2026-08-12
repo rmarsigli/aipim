@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Discovery: brainstorming becomes a phase the project records, instead of a conversation that
+dies in the chat. See `.project/docs/specs/2026-08-12-discovery-design.md` and
+`.project/decisions/2026-08-12-ADR011-json-documents-in-the-read-model.md`.
+
+### Added
+
+**Discovery sessions (`src/core/discovery.ts`)**
+- `discovery.started` and `discovery.state_updated` events, plus `discovery_sessions` and
+  `discovery_states` in the read model.
+- The distilled state is stored as a **whole snapshot per turn**, not as granular per-note
+  events. The log is append-only, so snapshots yield version history for free, and no query
+  anyone makes needs the granular form.
+- Six fields: `problem`, `agreements`, `alternatives`, `assumptions`, `grounding`,
+  `openThreads`. `alternatives` is what a bare `log_decision` loses — the options that were
+  rejected, and why.
+- **Skipping a question is first-class and never silent.** A skipped question becomes an
+  `assumption` carrying the premise adopted in its place and whether it is critical. That is
+  simultaneously the record of what was decided without an answer and the agenda for
+  resuming the session.
+- `find_related` grounds a discussion against existing tasks and decisions before the first
+  question. An empty project matches nothing, which is why greenfield and mid-project
+  discovery need no separate code path.
+- `start_discovery`, `update_discovery_state`, `get_discovery_state`, `find_related`.
+
+**Changesets (`src/core/changeset.ts`)**
+- `discovery.changeset_proposed` and `discovery.resolved` events, plus the `changesets` table.
+- A changeset is a **diff over the project graph** — tasks, dependency edges, decisions, docs —
+  not a spec document. Local refs (`#1`) let edges point at tasks that do not exist yet.
+- Application reuses the ordinary write events (`task.created`, `task.dependency_added`,
+  `decision.logged`), so the Kanban, the graph and `get_next_task` operate on the result
+  without knowing discovery exists.
+- `appendEvents()` writes a batch under a single lock hold, which is what makes application
+  atomic. Task IDs are allocated in memory across the batch.
+- Structural validation, not configurable: dependency refs resolve, no cycles against existing
+  edges, `supersedes` names a real decision, doc paths stay inside the project.
+- `propose_changeset` records and reports; it never blocks. Rejection belongs to
+  `resolve_changeset` — the same split as `verify_task` and `complete_task`.
+- `propose_changeset`, `resolve_changeset`.
+
+**Consensus gate (`src/core/discovery-gate.ts`)**
+- `[discovery]` in `config.toml`: `max_open_critical`, `max_tasks_per_changeset`,
+  `require_estimates`, `require_grounding`. Unconfigured, the gate is a no-op.
+- The two counting rules target opposite failure modes of the same mechanism:
+  `max_open_critical` catches deciding in the dark, `max_tasks_per_changeset` catches
+  hallucinated completeness.
+- `force: true` applies anyway and records `validatorsBypassed` — auditable, not invisible.
+  Force never covers structural validation.
+
+**The playbook**
+- `aipim install` writes `.project/prompts/discovery.md` for every project, plus a real
+  Claude Code skill at `.claude/skills/aipim-discovery/SKILL.md`.
+- The skill's `description` describes **explicit invocation, never intent** — phrasing it
+  around intent is what makes a skill fire on its own, which is the one thing discovery must
+  not do. The mechanism backs the rule up: a changeset exists only inside a session, and a
+  session only starts when the user asks.
+- The `SessionStart` hook and `get_project_context` report open discoveries. They never
+  enter one.
+
+**Provenance**
+- `sessionId` on `BaseEvent`, `session_id` on `tasks` and `decisions`. Every task and ADR a
+  changeset creates points back at the conversation that produced it — half of TASK-037,
+  obtained as a side effect. TASK-037 rescoped 10h → 6h.
+- `.project/discovery/YYYY-MM-DD-D00X-topic.md` written on application: the human-readable
+  record, with the rejected alternatives and the open assumptions.
+- `decision.logged` gained `supersedes`, and `decisions` gained `superseded_by`. A superseded
+  ADR is marked, never deleted.
+
+**UI**
+- `GET /api/discoveries` and `GET /api/discoveries/:id`.
+- Discovery routes: session list, and a detail view rendering the distilled state and the
+  changeset as a readable diff. Read-only — conducting discovery in the UI would lose the
+  agent, which is where the value is.
+
+### Fixed
+
+- **`readEvents` could serve a stale parse of a different file.** The cache keyed only on
+  `mtimeMs`, so a file deleted and recreated within the same clock tick hit the cache and
+  returned the previous file's events. Now keyed on inode and size as well. Surfaced as an
+  intermittent failure in `tests/core/events.test.ts` that only appeared under full-suite
+  timing.
+
+### Changed
+
+- `create_task` accepts `estimatedHours`, written into the task's frontmatter.
+- `slugify`, `today`, `taskMarkdown` and `adrMarkdown` moved from `mcp/tools/write.ts` to
+  `src/core/markdown.ts`, so a task file looks the same whether a tool or a changeset made it.
+- Test suite: 358 → 478 tests.
+
 ## [2.3.2] - 2026-08-12
 
 Two install-time bugs, both found by installing the package the way a new user would rather
