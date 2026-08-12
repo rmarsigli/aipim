@@ -1,14 +1,15 @@
 # Backlog
 
-> AIPIM 2.2 — o event log como mecanismo de controle, não só como registro.
+> AIPIM 2.3 — o event log como mecanismo de controle, não só como registro.
 
 ## Roadmap
 
 **2.0** — Tasks 001–015: reescrita event-sourced (JSONL + SQLite + MCP + Svelte UI) — ✅
-**2.1** — Skills como módulos de contexto + Active Skills (MCP) + Laravel Boost — ✅
-**2.2** — Loop & graph: gate de verificação, grafo de dependências, hooks — 🔄 em andamento
+**2.1** — Laravel Boost — ✅
+**2.2** — Skills como módulos de contexto + Active Skills (MCP) — ✅
+**2.3** — Loop & graph: gate de verificação, grafo de dependências, hooks — ✅
 
-### Entregue em 2.2
+### Entregue em 2.3
 
 | Peça | Descrição |
 |---|---|
@@ -45,7 +46,7 @@ Fonte de verdade: `events.jsonl`. Rode `aipim deps` para o grafo atual.
 
 ---
 
-## Contexto da fase 2.2
+## Contexto da fase 2.3
 
 A revisão que originou estas tasks partiu de duas ideias que ganharam nome em 2026:
 

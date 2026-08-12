@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2.2.0
+## [2.3.0] - 2026-08-12
 
 The event log stops being only a record and starts being the mechanism that enforces the process. See `.project/decisions/2026-08-12-ADR010-loop-and-graph-engineering.md`.
 
@@ -53,6 +53,32 @@ The event log stops being only a record and starts being the mechanism that enfo
 
 - `tests/mcp/read-tools.test.ts` and `tests/mcp/write-tools.test.ts` now build their fixtures with the real `rebuild()` schema instead of duplicating DDL, so they cannot drift from `core/db.ts`.
 - Test suite: 260 → 353 tests.
+
+## [2.2.0] - 2026-03-20
+
+Released on GitHub as "Skills System" but never recorded here — reconstructed from the release notes and the commits between `v2.1.0` and `v2.2.0`.
+
+### Added
+
+**Context modules (`src/core/skills.ts`)**
+- `aipim add skill <name>` injects technology-specific guidelines into `CLAUDE.md` / `GEMINI.md`, or into `.ai/guidelines/skill-<name>.blade.php` for Laravel Boost projects. Idempotent.
+- `aipim list skills` lists what is available.
+- 19 built-in skills: `tailwind`, `typescript`, `pest`, `vitest`, `react`, `vue`, `svelte`, `laravel`, `php`, `python`, `rust`, `django`, `fastapi`, `langchain`, `nextjs`, `prisma`, `docker`, `rest-api`, `security`.
+
+**Active skills (`src/mcp/skills/`)**
+- Skills can expose extra MCP tools, enabled per project via `active_skills` in `config.toml` and merged into the toolset at runtime — no server restart.
+- First active skill: `database`, adding `aipim_db_schema` and `aipim_db_query` for read-only access to local SQLite files. Writes are blocked at the driver level.
+
+### Fixed
+
+- Path traversal in `PUT /api/tasks/:id/content` and in `log_decision`.
+- `appendEvent()` is async with a per-project write lock, preventing interleaved writes under concurrent tool calls.
+- `POST /api/events` validates `type` against a whitelist of known event types.
+- 30s timeout on MCP tool handlers so a hung tool cannot hang the server.
+
+### Performance
+
+- `readEvents()` caches by file mtime, avoiding a re-read and re-parse of `events.jsonl` on every MCP request.
 
 ## [2.1.0] - 2026-03-19
 

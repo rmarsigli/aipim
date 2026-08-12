@@ -8,7 +8,7 @@ next_action: "TASK-033: view de grafo de dependências na UI"
 
 # Current State
 
-AIPIM 2.2 em desenvolvimento: o event log deixou de ser só registro e virou mecanismo de
+AIPIM 2.3: o event log deixou de ser só registro e virou mecanismo de
 controle. Três peças entraram — gate de verificação, grafo de dependências no read model, e
 hooks do Claude Code. 358 testes passando, lint e type-check limpos.
 

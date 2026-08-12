@@ -18,7 +18,7 @@ AIPIM is a project manager built around an **append-only event log**. All state 
 
 An **MCP server** (Model Context Protocol) exposes tools that Claude Code calls directly — no copy-paste, no clipboard workflow. A **REST API** serves the same data for the Svelte UI.
 
-Since 2.2 the log is not only a record of what happened — it is what enforces the process:
+Since 2.3 the log is not only a record of what happened — it is what enforces the process:
 
 - A **verification gate** refuses to mark a task done until the project's checks have actually passed against the current state of the work.
 - A **task graph** decides what can start now, so an agent is never handed work that is still blocked.
