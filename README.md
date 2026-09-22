@@ -1,5 +1,7 @@
 # AIPIM
 
+> **This project is archived**. I'm primarily using Claude Code with a custom multi-agent setup and AIPIM-based graphs. A new version of this repo is in the works to address other gaps, with no set release date or forecast.
+
 ```text
     ▄▄█▄▄      █████╗ ██╗██████╗ ██╗███╗   ███╗
   ▀▀▀███▀▀▀   ██╔══██╗██║██╔══██╗██║████╗ ████║
